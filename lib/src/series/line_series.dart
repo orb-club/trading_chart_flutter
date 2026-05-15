@@ -120,7 +120,10 @@ class LineSeries {
 
   /// Smallest `i` in `[0..n]` such that `xForTime(data[i].time) >= target`.
   /// Returns `n` if no such index exists.
-  int _firstIndexWithXAtLeast(double target, double Function(int time) xForTime) {
+  int _firstIndexWithXAtLeast(
+    double target,
+    double Function(int time) xForTime,
+  ) {
     var lo = 0;
     var hi = data.length;
     while (lo < hi) {

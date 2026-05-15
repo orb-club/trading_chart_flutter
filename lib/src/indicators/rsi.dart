@@ -15,10 +15,7 @@ List<LinePoint> relativeStrengthIndex(List<Candle> candles, int period) {
     ];
   }
   final n = candles.length;
-  final out = List<LinePoint>.filled(
-    n,
-    const LinePoint(time: 0, value: 0),
-  );
+  final out = List<LinePoint>.filled(n, const LinePoint(time: 0, value: 0));
 
   var gainSum = 0.0;
   var lossSum = 0.0;

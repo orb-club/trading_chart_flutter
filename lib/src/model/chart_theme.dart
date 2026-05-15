@@ -49,6 +49,21 @@ class ChartTheme {
   /// Color of the dashed last-value horizontal price line.
   final Color priceLine;
 
+  /// Color used for volume bars.
+  final Color volumeColor;
+
+  /// Height of the bottom fade drawn over volume bars.
+  final double volumeFadeHeight;
+
+  /// Top color of the bottom fade drawn over volume bars.
+  final Color volumeFadeStart;
+
+  /// Bottom color of the bottom fade drawn over volume bars.
+  final Color volumeFadeEnd;
+
+  /// Corner radius for candle bodies.
+  final double candleBodyRadius;
+
   /// Font size used for axis tick labels and badges.
   final double axisFontSize;
 
@@ -69,6 +84,11 @@ class ChartTheme {
     required this.lastValueLabelBg,
     required this.lastValueLabelText,
     required this.priceLine,
+    this.volumeColor = const Color(0xFF272727),
+    this.volumeFadeHeight = 16,
+    this.volumeFadeStart = const Color(0x00141414),
+    this.volumeFadeEnd = const Color(0xFF141414),
+    this.candleBodyRadius = 2,
     this.axisFontSize = 11,
   });
 

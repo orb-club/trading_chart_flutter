@@ -253,18 +253,25 @@ class OverlayPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(color: fg, fontSize: fontSize),
+        style: TextStyle(
+          color: fg,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    const padX = 6.0;
-    const padY = 3.0;
+    const padX = 8.0;
+    const padY = 4.0;
     final w = tp.width + padX * 2;
     final h = tp.height + padY * 2;
     final left = axisRect.left + 1;
     final top = (y - h / 2).clamp(axisRect.top, axisRect.bottom - h);
-    final rect = Rect.fromLTWH(left, top, w, h);
-    canvas.drawRect(rect, ui.Paint()..color = bg);
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(left, top, w, h),
+      const Radius.circular(8),
+    );
+    canvas.drawRRect(rect, ui.Paint()..color = bg);
     tp.paint(canvas, Offset(left + padX, top + padY));
   }
 

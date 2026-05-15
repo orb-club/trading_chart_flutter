@@ -10,14 +10,12 @@ import '../scale/time_scale.dart';
 /// Volume bars rendered in an "overlay" sub-region inside the main plot,
 /// using their own [PriceScale] (0..maxVolume in view).
 ///
-/// The series picks bar color based on the candle direction
-/// (up = up color tinted, down = down color tinted), matching LWC defaults.
+/// The series uses the theme volume color for every bar.
 @immutable
 class VolumeHistogramSeries {
   final List<Candle> data;
-  final double opacity;
 
-  const VolumeHistogramSeries({required this.data, this.opacity = 0.5});
+  const VolumeHistogramSeries({required this.data});
 
   void paint({
     required ui.Canvas canvas,
@@ -30,12 +28,7 @@ class VolumeHistogramSeries {
     final width = size.width;
     final height = size.height;
 
-    // Use the legacy `withOpacity` rather than `withValues(alpha: ...)` so
-    // the package keeps working on Flutter < 3.27.
-    // ignore: deprecated_member_use
-    final upPaint = ui.Paint()..color = theme.upColor.withOpacity(opacity);
-    // ignore: deprecated_member_use
-    final downPaint = ui.Paint()..color = theme.downColor.withOpacity(opacity);
+    final paint = ui.Paint()..color = theme.volumeColor;
 
     final range = timeScale.visibleIntegerRange(width);
     final barWidth = (timeScale.barSpacing * 0.7).clamp(1.0, double.infinity);
@@ -53,7 +46,7 @@ class VolumeHistogramSeries {
       final right = (x + barWidth / 2).roundToDouble();
       canvas.drawRect(
         ui.Rect.fromLTRB(left, topY, right, baseY),
-        c.isUp ? upPaint : downPaint,
+        paint,
       );
     }
   }

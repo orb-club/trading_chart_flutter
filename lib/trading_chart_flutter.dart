@@ -15,8 +15,7 @@ export 'src/indicators/bollinger_bands.dart'
 export 'src/indicators/moving_average.dart'
     show simpleMovingAverage, exponentialMovingAverage;
 export 'src/indicators/rsi.dart' show relativeStrengthIndex;
-export 'src/model/bar_marker.dart'
-    show BarMarker, MarkerPosition, MarkerShape;
+export 'src/model/bar_marker.dart' show BarMarker, MarkerPosition, MarkerShape;
 export 'src/model/candle.dart';
 export 'src/model/chart_pane.dart' show ChartPane, PaneLevel;
 export 'src/model/chart_theme.dart';

@@ -86,7 +86,12 @@ class CandlestickSeries {
       }
       final left = (x - bodyWidth / 2).roundToDouble();
       final right = (x + bodyWidth / 2).roundToDouble();
-      canvas.drawRect(ui.Rect.fromLTRB(left, top, right, bottom), bodyPaint);
+      final bodyRect = ui.Rect.fromLTRB(left, top, right, bottom);
+      final radius = ui.Radius.circular(theme.candleBodyRadius);
+      canvas.drawRRect(
+        ui.RRect.fromRectAndRadius(bodyRect, radius),
+        bodyPaint,
+      );
     }
   }
 }

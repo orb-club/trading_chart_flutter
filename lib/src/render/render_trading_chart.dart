@@ -241,8 +241,7 @@ class RenderTradingChart extends RenderBox {
     final lo = idx.floor();
     final hi = lo + 1;
     final frac = idx - lo;
-    return (_candles[lo].time +
-            frac * (_candles[hi].time - _candles[lo].time))
+    return (_candles[lo].time + frac * (_candles[hi].time - _candles[lo].time))
         .round();
   }
 
@@ -364,8 +363,7 @@ class RenderTradingChart extends RenderBox {
 
     // Per-pane requested heights, each clamped to a sane band.
     final requested = [
-      for (final p in _panes)
-        (p.heightRatio.clamp(0.05, 0.6)) * totalH,
+      for (final p in _panes) (p.heightRatio.clamp(0.05, 0.6)) * totalH,
     ];
     var requestedSum = requested.fold<double>(0, (a, b) => a + b);
     final maxExtras = totalH * 0.7;
@@ -377,8 +375,10 @@ class RenderTradingChart extends RenderBox {
       requestedSum = maxExtras;
     }
     final separatorTotal = _paneSeparatorPx * _panes.length;
-    final mainHeight =
-        (totalH - requestedSum - separatorTotal).clamp(0.0, totalH);
+    final mainHeight = (totalH - requestedSum - separatorTotal).clamp(
+      0.0,
+      totalH,
+    );
 
     final extraRects = <ui.Rect>[];
     final separators = <double>[];
@@ -509,6 +509,7 @@ class RenderTradingChart extends RenderBox {
             priceScale: _volumeScale,
             theme: _theme,
           );
+          _paintVolumeBottomFade(canvas, plotRect);
         }
       }
       // Candles on top.
@@ -658,11 +659,7 @@ class RenderTradingChart extends RenderBox {
           ..strokeWidth = 1;
         for (final sy in layout.separators) {
           final y = sy.roundToDouble() + 0.5;
-          canvas.drawLine(
-            ui.Offset(0, y),
-            ui.Offset(_plotWidth, y),
-            sepPaint,
-          );
+          canvas.drawLine(ui.Offset(0, y), ui.Offset(_plotWidth, y), sepPaint);
         }
       }
 
@@ -850,9 +847,8 @@ class RenderTradingChart extends RenderBox {
       return _timeScale.indexToX(idx, _plotWidth);
     }
     if (time >= last) {
-      final idx = avgStep > 0
-          ? (n - 1) + (time - last) / avgStep
-          : (n - 1).toDouble();
+      final idx =
+          avgStep > 0 ? (n - 1) + (time - last) / avgStep : (n - 1).toDouble();
       return _timeScale.indexToX(idx, _plotWidth);
     }
     // Binary search: find lo such that candles[lo].time <= time < candles[lo+1].time.
@@ -871,6 +867,32 @@ class RenderTradingChart extends RenderBox {
     final span = tHi - tLo;
     final frac = span > 0 ? (time - tLo) / span : 0.0;
     return _timeScale.indexToX(lo + frac, _plotWidth);
+  }
+
+  void _paintVolumeBottomFade(ui.Canvas canvas, ui.Rect plotRect) {
+    final fadeHeight = _theme.volumeFadeHeight;
+    if (fadeHeight <= 0) return;
+
+    final fadeTop = (plotRect.bottom - fadeHeight).clamp(
+      plotRect.top,
+      plotRect.bottom,
+    );
+    final fadeRect = ui.Rect.fromLTRB(
+      plotRect.left,
+      fadeTop,
+      plotRect.right,
+      plotRect.bottom,
+    );
+    final paint = ui.Paint()
+      ..shader = ui.Gradient.linear(
+        fadeRect.topCenter,
+        fadeRect.bottomCenter,
+        [
+          _theme.volumeFadeStart,
+          _theme.volumeFadeEnd,
+        ],
+      );
+    canvas.drawRect(fadeRect, paint);
   }
 
   // ───────── hit test ─────────

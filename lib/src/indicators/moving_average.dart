@@ -28,10 +28,7 @@ List<LinePoint> simpleMovingAverage(List<Candle> candles, int period) {
 List<LinePoint> exponentialMovingAverage(List<Candle> candles, int period) {
   if (period <= 0 || candles.isEmpty) return const [];
   final n = candles.length;
-  final out = List<LinePoint>.filled(
-    n,
-    const LinePoint(time: 0, value: 0),
-  );
+  final out = List<LinePoint>.filled(n, const LinePoint(time: 0, value: 0));
   final k = 2.0 / (period + 1);
   var ema = double.nan;
   var seedSum = 0.0;
