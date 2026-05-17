@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import '../model/candle.dart';
 import '../model/chart_theme.dart';
 import '../model/crosshair.dart';
+import '../model/last_value_label.dart';
 import '../scale/price_scale.dart';
 import '../scale/time_scale.dart';
 import '../chart_controller.dart';
@@ -34,6 +35,7 @@ class RenderTradingChart extends RenderBox {
     double timeAxisHeight = 24,
     bool showCrosshairOverlay = true,
     bool showOhlcLegend = true,
+    bool showLastValueLabel = true,
   })  : _candles = candles,
         _theme = theme,
         _showVolume = showVolume,
@@ -44,6 +46,7 @@ class RenderTradingChart extends RenderBox {
         _timeAxisHeight = timeAxisHeight,
         _showCrosshairOverlay = showCrosshairOverlay,
         _showOhlcLegend = showOhlcLegend,
+        _showLastValueLabel = showLastValueLabel,
         _paneScales = List.generate(panes.length, (_) => PriceScale()),
         _timeScale = TimeScale(
           dataLength: candles.length,
@@ -143,6 +146,14 @@ class RenderTradingChart extends RenderBox {
   set showOhlcLegend(bool v) {
     if (_showOhlcLegend == v) return;
     _showOhlcLegend = v;
+    markNeedsPaint();
+  }
+
+  bool _showLastValueLabel;
+  bool get showLastValueLabel => _showLastValueLabel;
+  set showLastValueLabel(bool v) {
+    if (_showLastValueLabel == v) return;
+    _showLastValueLabel = v;
     markNeedsPaint();
   }
 
@@ -367,6 +378,9 @@ class RenderTradingChart extends RenderBox {
   /// Listener invoked whenever the crosshair target changes.
   TradingChartCrosshairChanged? onCrosshairChanged;
 
+  /// Listener invoked whenever the latest-price label position changes.
+  TradingChartLastValueLabelChanged? onLastValueLabelChanged;
+
   /// Set crosshair position in local coordinates (relative to render box origin).
   /// Pass null to hide.
   void setCrosshair(Offset? local) {
@@ -393,6 +407,14 @@ class RenderTradingChart extends RenderBox {
     final price =
         local.dy < 0 || local.dy > mainPlotHeight ? null : priceForY(local.dy);
     cb(local, idx, _candles[idx], price);
+  }
+
+  TradingChartLastValueLabel? _lastValueLabel;
+
+  void _notifyLastValueLabelChanged(TradingChartLastValueLabel? label) {
+    if (_lastValueLabel == label) return;
+    _lastValueLabel = label;
+    onLastValueLabelChanged?.call(label);
   }
 
   // ───────── layout ─────────
@@ -548,6 +570,21 @@ class RenderTradingChart extends RenderBox {
         timeScale: _timeScale,
         width: _plotWidth,
       );
+      final lastValueY = _priceScale.priceToY(
+        _candles.last.close,
+        plotRect.height,
+      );
+      _notifyLastValueLabelChanged(
+        lastValueY < plotRect.top || lastValueY > plotRect.bottom
+            ? null
+            : TradingChartLastValueLabel(
+                candle: _candles.last,
+                price: _candles.last.close,
+                y: lastValueY,
+                plotRect: plotRect,
+                priceAxisRect: priceAxisRect,
+              ),
+      );
 
       // Grid behind series.
       canvas.save();
@@ -617,6 +654,7 @@ class RenderTradingChart extends RenderBox {
         lastCandle: _candles.last,
         priceScale: _priceScale,
         priceStep: priceStep,
+        showLabel: false,
       );
       // Crosshair (also clipped). Bar index is shared by all panes; only the
       // panel that contains the cursor gets the horizontal line + Y badge.
@@ -673,6 +711,7 @@ class RenderTradingChart extends RenderBox {
         lastCandle: _candles.last,
         priceScale: _priceScale,
         priceStep: priceStep,
+        showLabel: _showLastValueLabel,
       );
 
       // Crosshair badges over axes (main pane only).
@@ -753,6 +792,8 @@ class RenderTradingChart extends RenderBox {
           );
         }
       }
+    } else {
+      _notifyLastValueLabelChanged(null);
     }
 
     canvas.restore();

@@ -17,25 +17,24 @@ class OverlayPainter {
     required Candle lastCandle,
     required PriceScale priceScale,
     required double priceStep,
+    bool showLabel = true,
   }) {
     final y = priceScale.priceToY(lastCandle.close, plotRect.height);
     if (y < plotRect.top || y > plotRect.bottom) return;
 
     final yLine = y.roundToDouble() + 0.5;
-    final dashPaint = ui.Paint()
+    final linePaint = ui.Paint()
       ..color = theme.priceLine
       ..strokeWidth = 1
       ..style = ui.PaintingStyle.stroke;
 
-    _drawDashedHLine(
-      canvas,
-      yLine,
-      plotRect.left,
-      plotRect.right,
-      dashPaint,
-      dash: 4,
-      gap: 4,
+    canvas.drawLine(
+      ui.Offset(plotRect.left, yLine),
+      ui.Offset(plotRect.right, yLine),
+      linePaint,
     );
+
+    if (!showLabel) return;
 
     _drawAxisBadge(
       canvas: canvas,
@@ -62,7 +61,7 @@ class OverlayPainter {
     required PriceScale priceScale,
     required double priceStep,
   }) {
-    final dashPaint = ui.Paint()
+    final linePaint = ui.Paint()
       ..color = theme.crosshair
       ..strokeWidth = 1
       ..style = ui.PaintingStyle.stroke;
@@ -73,25 +72,17 @@ class OverlayPainter {
             .roundToDouble() +
         0.5;
 
-    _drawDashedVLine(
-      canvas,
-      snappedX,
-      plotRect.top,
-      plotRect.bottom,
-      dashPaint,
-      dash: 4,
-      gap: 4,
+    canvas.drawLine(
+      ui.Offset(snappedX, plotRect.top),
+      ui.Offset(snappedX, plotRect.bottom),
+      linePaint,
     );
 
     final cy = position.dy.clamp(plotRect.top, plotRect.bottom);
-    _drawDashedHLine(
-      canvas,
-      cy.roundToDouble() + 0.5,
-      plotRect.left,
-      plotRect.right,
-      dashPaint,
-      dash: 4,
-      gap: 4,
+    canvas.drawLine(
+      ui.Offset(plotRect.left, cy.roundToDouble() + 0.5),
+      ui.Offset(plotRect.right, cy.roundToDouble() + 0.5),
+      linePaint,
     );
 
     // Price badge on right axis.
@@ -136,7 +127,7 @@ class OverlayPainter {
       ..strokeWidth = 1
       ..style = ui.PaintingStyle.stroke;
     final snapped = x.roundToDouble() + 0.5;
-    _drawDashedVLine(canvas, snapped, fromY, toY, paint, dash: 4, gap: 4);
+    canvas.drawLine(ui.Offset(snapped, fromY), ui.Offset(snapped, toY), paint);
   }
 
   /// Horizontal dashed crosshair + Y-axis price badge inside an extra pane.
@@ -154,14 +145,10 @@ class OverlayPainter {
       ..strokeWidth = 1
       ..style = ui.PaintingStyle.stroke;
     final cy = y.clamp(paneRect.top, paneRect.bottom);
-    _drawDashedHLine(
-      canvas,
-      cy.roundToDouble() + 0.5,
-      paneRect.left,
-      paneRect.right,
+    canvas.drawLine(
+      ui.Offset(paneRect.left, cy.roundToDouble() + 0.5),
+      ui.Offset(paneRect.right, cy.roundToDouble() + 0.5),
       paint,
-      dash: 4,
-      gap: 4,
     );
     _drawAxisBadge(
       canvas: canvas,
@@ -309,40 +296,6 @@ class OverlayPainter {
     );
     canvas.drawRRect(rect, ui.Paint()..color = bg);
     tp.paint(canvas, Offset(left + padX, top + padY));
-  }
-
-  static void _drawDashedHLine(
-    ui.Canvas canvas,
-    double y,
-    double x1,
-    double x2,
-    ui.Paint paint, {
-    required double dash,
-    required double gap,
-  }) {
-    var x = x1;
-    while (x < x2) {
-      final next = (x + dash).clamp(x1, x2);
-      canvas.drawLine(Offset(x, y), Offset(next, y), paint);
-      x += dash + gap;
-    }
-  }
-
-  static void _drawDashedVLine(
-    ui.Canvas canvas,
-    double x,
-    double y1,
-    double y2,
-    ui.Paint paint, {
-    required double dash,
-    required double gap,
-  }) {
-    var y = y1;
-    while (y < y2) {
-      final next = (y + dash).clamp(y1, y2);
-      canvas.drawLine(Offset(x, y), Offset(x, next), paint);
-      y += dash + gap;
-    }
   }
 
   static String _formatDateTime(DateTime dt) {

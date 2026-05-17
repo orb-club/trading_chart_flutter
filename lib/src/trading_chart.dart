@@ -10,6 +10,7 @@ import 'model/bar_marker.dart';
 import 'model/chart_pane.dart';
 import 'model/chart_theme.dart';
 import 'model/crosshair.dart';
+import 'model/last_value_label.dart';
 import 'render/render_trading_chart.dart';
 import 'series/line_series.dart';
 
@@ -36,7 +37,9 @@ class TradingChart extends LeafRenderObjectWidget {
     this.timeAxisHeight = 24,
     this.showCrosshairOverlay = true,
     this.showOhlcLegend = true,
+    this.showLastValueLabel = true,
     this.onCrosshairChanged,
+    this.onLastValueLabelChanged,
   });
 
   /// The full ordered list of bars to render. Times must be ascending.
@@ -89,8 +92,14 @@ class TradingChart extends LeafRenderObjectWidget {
   /// Whether the package paints its built-in OHLC legend.
   final bool showOhlcLegend;
 
+  /// Whether the package paints its built-in latest-price label.
+  final bool showLastValueLabel;
+
   /// Optional listener for externally painting app-specific crosshair UI.
   final TradingChartCrosshairChanged? onCrosshairChanged;
+
+  /// Optional listener for externally positioning a latest-price label widget.
+  final TradingChartLastValueLabelChanged? onLastValueLabelChanged;
 
   @override
   RenderTradingChart createRenderObject(BuildContext context) {
@@ -108,10 +117,12 @@ class TradingChart extends LeafRenderObjectWidget {
       timeAxisHeight: timeAxisHeight,
       showCrosshairOverlay: showCrosshairOverlay,
       showOhlcLegend: showOhlcLegend,
+      showLastValueLabel: showLastValueLabel,
     );
     r
       ..onVisibleRangeChanged = onVisibleRangeChanged
-      ..onCrosshairChanged = onCrosshairChanged;
+      ..onCrosshairChanged = onCrosshairChanged
+      ..onLastValueLabelChanged = onLastValueLabelChanged;
     controller?.attach(r);
     return r;
   }
@@ -133,8 +144,10 @@ class TradingChart extends LeafRenderObjectWidget {
       ..timeAxisHeight = timeAxisHeight
       ..showCrosshairOverlay = showCrosshairOverlay
       ..showOhlcLegend = showOhlcLegend
+      ..showLastValueLabel = showLastValueLabel
       ..onVisibleRangeChanged = onVisibleRangeChanged
-      ..onCrosshairChanged = onCrosshairChanged;
+      ..onCrosshairChanged = onCrosshairChanged
+      ..onLastValueLabelChanged = onLastValueLabelChanged;
     if (controller != null) controller!.attach(renderObject);
   }
 
@@ -178,6 +191,7 @@ class InteractiveTradingChart extends StatefulWidget {
     this.timeAxisHeight = 24,
     this.showCrosshairOverlay = true,
     this.showOhlcLegend = true,
+    this.lastValueLabelBuilder,
     this.onCrosshairChanged,
   });
 
@@ -231,6 +245,12 @@ class InteractiveTradingChart extends StatefulWidget {
   /// Whether the package paints its built-in OHLC legend.
   final bool showOhlcLegend;
 
+  /// Builds a custom latest-price label widget.
+  ///
+  /// When provided, the package owns the label position but does not paint the
+  /// built-in latest-price label on the canvas.
+  final TradingChartLastValueLabelBuilder? lastValueLabelBuilder;
+
   /// Optional listener for externally painting app-specific crosshair UI.
   final TradingChartCrosshairChanged? onCrosshairChanged;
 
@@ -242,6 +262,8 @@ class InteractiveTradingChart extends StatefulWidget {
 class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     with TickerProviderStateMixin {
   final GlobalKey _chartKey = GlobalKey();
+  TradingChartLastValueLabel? _lastValueLabel;
+  bool _lastValueLabelUpdateScheduled = false;
 
   RenderTradingChart? get _render =>
       _chartKey.currentContext?.findRenderObject() as RenderTradingChart?;
@@ -556,6 +578,50 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
   @override
   Widget build(BuildContext context) {
+    final lastValueLabelBuilder = widget.lastValueLabelBuilder;
+    final chart = TradingChart(
+      key: _chartKey,
+      candles: widget.candles,
+      theme: widget.theme,
+      initialBarSpacing: widget.initialBarSpacing,
+      rightOffsetBars: widget.rightOffsetBars,
+      showVolume: widget.showVolume,
+      overlays: widget.overlays,
+      panes: widget.panes,
+      markers: widget.markers,
+      controller: widget.controller,
+      onVisibleRangeChanged: widget.onVisibleRangeChanged,
+      logarithmicPriceScale: widget.logarithmicPriceScale,
+      priceAxisWidth: widget.priceAxisWidth,
+      timeAxisHeight: widget.timeAxisHeight,
+      showCrosshairOverlay: widget.showCrosshairOverlay,
+      showOhlcLegend: widget.showOhlcLegend,
+      showLastValueLabel: lastValueLabelBuilder == null,
+      onCrosshairChanged: widget.onCrosshairChanged,
+      onLastValueLabelChanged:
+          lastValueLabelBuilder == null ? null : _handleLastValueLabelChanged,
+    );
+    final child = lastValueLabelBuilder == null
+        ? chart
+        : Stack(
+            fit: StackFit.expand,
+            children: [
+              chart,
+              if (_lastValueLabel case final label?)
+                IgnorePointer(
+                  child: CustomMultiChildLayout(
+                    delegate: _LastValueLabelLayoutDelegate(label),
+                    children: [
+                      LayoutId(
+                        id: _ChartOverlaySlot.lastValueLabel,
+                        child: lastValueLabelBuilder(context, label),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          );
+
     return Listener(
       onPointerSignal: _onPointerSignal,
       onPointerHover: _onHover,
@@ -574,27 +640,63 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
           onLongPressStart: _onLongPressStart,
           onLongPressMoveUpdate: _onLongPressMove,
           onLongPressEnd: _onLongPressEnd,
-          child: TradingChart(
-            key: _chartKey,
-            candles: widget.candles,
-            theme: widget.theme,
-            initialBarSpacing: widget.initialBarSpacing,
-            rightOffsetBars: widget.rightOffsetBars,
-            showVolume: widget.showVolume,
-            overlays: widget.overlays,
-            panes: widget.panes,
-            markers: widget.markers,
-            controller: widget.controller,
-            onVisibleRangeChanged: widget.onVisibleRangeChanged,
-            logarithmicPriceScale: widget.logarithmicPriceScale,
-            priceAxisWidth: widget.priceAxisWidth,
-            timeAxisHeight: widget.timeAxisHeight,
-            showCrosshairOverlay: widget.showCrosshairOverlay,
-            showOhlcLegend: widget.showOhlcLegend,
-            onCrosshairChanged: widget.onCrosshairChanged,
-          ),
+          child: child,
         ),
       ),
     );
+  }
+
+  void _handleLastValueLabelChanged(TradingChartLastValueLabel? label) {
+    if (_lastValueLabel == label || _lastValueLabelUpdateScheduled) {
+      return;
+    }
+
+    _lastValueLabelUpdateScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _lastValueLabelUpdateScheduled = false;
+      if (!mounted || _lastValueLabel == label) {
+        return;
+      }
+
+      setState(() => _lastValueLabel = label);
+    });
+  }
+}
+
+enum _ChartOverlaySlot { lastValueLabel }
+
+class _LastValueLabelLayoutDelegate extends MultiChildLayoutDelegate {
+  _LastValueLabelLayoutDelegate(this.label);
+
+  final TradingChartLastValueLabel label;
+
+  @override
+  void performLayout(Size size) {
+    if (!hasChild(_ChartOverlaySlot.lastValueLabel)) {
+      return;
+    }
+
+    final childSize = layoutChild(
+      _ChartOverlaySlot.lastValueLabel,
+      BoxConstraints.loose(size),
+    );
+    final left = (label.priceAxisRect.right - childSize.width - 1).clamp(
+      0.0,
+      math.max(0, size.width - childSize.width).toDouble(),
+    );
+    final top = (label.y - childSize.height / 2).clamp(
+      label.priceAxisRect.top,
+      math
+          .max(label.priceAxisRect.top,
+              label.priceAxisRect.bottom - childSize.height)
+          .toDouble(),
+    );
+
+    positionChild(_ChartOverlaySlot.lastValueLabel, Offset(left, top));
+  }
+
+  @override
+  bool shouldRelayout(covariant _LastValueLabelLayoutDelegate oldDelegate) {
+    return oldDelegate.label != label;
   }
 }
