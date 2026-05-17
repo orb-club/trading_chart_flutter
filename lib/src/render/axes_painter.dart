@@ -130,8 +130,7 @@ class AxesPainter {
         text: t.label,
         x: axisRect.left + 6,
         y: t.y - 6,
-        color: theme.text,
-        size: theme.axisFontSize,
+        style: _axisTextStyle(theme.priceAxisTextStyle, theme),
       );
     }
   }
@@ -157,10 +156,20 @@ class AxesPainter {
         text: t.label,
         x: t.x + 4,
         y: axisRect.top + 4,
-        color: theme.text,
-        size: theme.axisFontSize,
+        style: _axisTextStyle(theme.timeAxisTextStyle, theme),
       );
     }
+  }
+
+  static TextStyle _axisTextStyle(
+    TextStyle? style,
+    ChartTheme theme,
+  ) {
+    return style ??
+        TextStyle(
+          color: theme.text,
+          fontSize: theme.axisFontSize,
+        );
   }
 
   static void _drawText({
@@ -168,13 +177,12 @@ class AxesPainter {
     required String text,
     required double x,
     required double y,
-    required ui.Color color,
-    required double size,
+    required TextStyle style,
   }) {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(color: color, fontSize: size),
+        style: style,
       ),
       textDirection: TextDirection.ltr,
     )..layout();

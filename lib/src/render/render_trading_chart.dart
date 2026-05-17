@@ -562,7 +562,7 @@ class RenderTradingChart extends RenderBox {
           PriceAxisTick(
             price: p,
             y: _priceScale.priceToY(p, plotRect.height),
-            label: NiceTicks.formatPrice(p, priceStep),
+            label: _formatPriceAxisLabel(p, priceStep),
           ),
       ];
       final timeTicks = TimeAxisTicks.compute(
@@ -862,7 +862,7 @@ class RenderTradingChart extends RenderBox {
           price: v,
           // priceToY returns Y in [0..paneRect.height]; offset to absolute.
           y: paneRect.top + paneScale.priceToY(v, paneRect.height),
-          label: NiceTicks.formatPrice(v, step),
+          label: _formatPriceAxisLabel(v, step),
         ),
     ];
 
@@ -979,6 +979,15 @@ class RenderTradingChart extends RenderBox {
     final span = tHi - tLo;
     final frac = span > 0 ? (time - tLo) / span : 0.0;
     return _timeScale.indexToX(lo + frac, _plotWidth);
+  }
+
+  String _formatPriceAxisLabel(double value, double step) {
+    final formatter = _theme.priceAxisLabelFormatter;
+    if (formatter != null) {
+      return formatter(value, step);
+    }
+
+    return NiceTicks.formatPrice(value, step);
   }
 
   void _paintVolumeBottomFade(ui.Canvas canvas, ui.Rect plotRect) {

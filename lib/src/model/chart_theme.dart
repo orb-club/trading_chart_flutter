@@ -1,6 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+/// Formats a price-axis tick value.
+typedef ChartPriceAxisLabelFormatter = String Function(
+  double value,
+  double step,
+);
+
 /// Visual style used for in-plot grid guides.
 enum ChartGridStyle {
   /// Draw continuous grid guide lines.
@@ -21,6 +27,19 @@ class ChartTheme {
 
   /// Color used for axis tick labels.
   final Color text;
+
+  /// Text style used for right-side price-axis labels.
+  ///
+  /// When null, [text] and [axisFontSize] are used.
+  final TextStyle? priceAxisTextStyle;
+
+  /// Text style used for bottom time-axis labels.
+  ///
+  /// When null, [text] and [axisFontSize] are used.
+  final TextStyle? timeAxisTextStyle;
+
+  /// Optional formatter for right-side price-axis labels.
+  final ChartPriceAxisLabelFormatter? priceAxisLabelFormatter;
 
   /// Color of the thin axis baseline that separates plot from axis.
   final Color axisLine;
@@ -101,6 +120,9 @@ class ChartTheme {
   const ChartTheme({
     required this.background,
     required this.text,
+    this.priceAxisTextStyle,
+    this.timeAxisTextStyle,
+    this.priceAxisLabelFormatter,
     required this.axisLine,
     required this.gridLine,
     this.gridStyle = ChartGridStyle.solid,
