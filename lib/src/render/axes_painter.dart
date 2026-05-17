@@ -24,19 +24,89 @@ class AxesPainter {
       ..color = theme.gridLine
       ..strokeWidth = 1;
     for (final t in priceTicks) {
-      canvas.drawLine(
-        ui.Offset(plotRect.left, t.y.roundToDouble() + 0.5),
-        ui.Offset(plotRect.right, t.y.roundToDouble() + 0.5),
-        paint,
-      );
+      final y = t.y.roundToDouble() + 0.5;
+      switch (theme.gridStyle) {
+        case ChartGridStyle.solid:
+          canvas.drawLine(
+            ui.Offset(plotRect.left, y),
+            ui.Offset(plotRect.right, y),
+            paint,
+          );
+        case ChartGridStyle.dotted:
+          _drawHorizontalDots(
+            canvas: canvas,
+            y: y,
+            fromX: plotRect.left,
+            toX: plotRect.right,
+            theme: theme,
+            paint: paint,
+          );
+      }
     }
     for (final t in timeTicks) {
       if (!t.isMajor) continue;
-      canvas.drawLine(
-        ui.Offset(t.x.roundToDouble() + 0.5, plotRect.top),
-        ui.Offset(t.x.roundToDouble() + 0.5, plotRect.bottom),
+      final x = t.x.roundToDouble() + 0.5;
+      switch (theme.gridStyle) {
+        case ChartGridStyle.solid:
+          canvas.drawLine(
+            ui.Offset(x, plotRect.top),
+            ui.Offset(x, plotRect.bottom),
+            paint,
+          );
+        case ChartGridStyle.dotted:
+          _drawVerticalDots(
+            canvas: canvas,
+            x: x,
+            fromY: plotRect.top,
+            toY: plotRect.bottom,
+            theme: theme,
+            paint: paint,
+          );
+      }
+    }
+  }
+
+  static void _drawHorizontalDots({
+    required ui.Canvas canvas,
+    required double y,
+    required double fromX,
+    required double toX,
+    required ChartTheme theme,
+    required ui.Paint paint,
+  }) {
+    final spacing = theme.gridDotSpacing;
+    if (spacing <= 0) return;
+
+    var x = fromX;
+    while (x <= toX) {
+      canvas.drawCircle(
+        ui.Offset(x.roundToDouble() + 0.5, y),
+        theme.gridDotRadius,
         paint,
       );
+      x += spacing;
+    }
+  }
+
+  static void _drawVerticalDots({
+    required ui.Canvas canvas,
+    required double x,
+    required double fromY,
+    required double toY,
+    required ChartTheme theme,
+    required ui.Paint paint,
+  }) {
+    final spacing = theme.gridDotSpacing;
+    if (spacing <= 0) return;
+
+    var y = fromY;
+    while (y <= toY) {
+      canvas.drawCircle(
+        ui.Offset(x, y.roundToDouble() + 0.5),
+        theme.gridDotRadius,
+        paint,
+      );
+      y += spacing;
     }
   }
 

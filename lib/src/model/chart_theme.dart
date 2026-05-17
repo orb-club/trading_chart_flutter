@@ -1,6 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+/// Visual style used for in-plot grid guides.
+enum ChartGridStyle {
+  /// Draw continuous grid guide lines.
+  solid,
+
+  /// Draw grid guides as evenly spaced dots.
+  dotted,
+}
+
 /// Color palette and font sizing for [TradingChart] / [InteractiveTradingChart].
 ///
 /// Use the built-in [ChartTheme.dark] / [ChartTheme.light] presets, or
@@ -18,6 +27,15 @@ class ChartTheme {
 
   /// Color of the in-plot grid lines.
   final Color gridLine;
+
+  /// Visual style used when painting the in-plot grid.
+  final ChartGridStyle gridStyle;
+
+  /// Radius of grid dots when [gridStyle] is [ChartGridStyle.dotted].
+  final double gridDotRadius;
+
+  /// Distance between dot centers when [gridStyle] is [ChartGridStyle.dotted].
+  final double gridDotSpacing;
 
   /// Body color for bullish (close >= open) candles.
   final Color upColor;
@@ -61,6 +79,17 @@ class ChartTheme {
   /// Bottom color of the bottom fade drawn over volume bars.
   final Color volumeFadeEnd;
 
+  /// Size of the four edge fades painted over the chart area.
+  ///
+  /// Set to zero to disable the edge fades.
+  final double edgeFadeSize;
+
+  /// Color at the outer edge of the four chart fades.
+  final Color edgeFadeOuterColor;
+
+  /// Color at the inner edge of the four chart fades.
+  final Color edgeFadeInnerColor;
+
   /// Corner radius for candle bodies.
   final double candleBodyRadius;
 
@@ -74,6 +103,9 @@ class ChartTheme {
     required this.text,
     required this.axisLine,
     required this.gridLine,
+    this.gridStyle = ChartGridStyle.solid,
+    this.gridDotRadius = 0.75,
+    this.gridDotSpacing = 8,
     required this.upColor,
     required this.downColor,
     required this.upWick,
@@ -88,6 +120,9 @@ class ChartTheme {
     this.volumeFadeHeight = 16,
     this.volumeFadeStart = const Color(0x00141414),
     this.volumeFadeEnd = const Color(0xFF141414),
+    this.edgeFadeSize = 0,
+    this.edgeFadeOuterColor = const Color(0xFF141414),
+    this.edgeFadeInnerColor = const Color(0x00141414),
     this.candleBodyRadius = 2,
     this.axisFontSize = 11,
   });

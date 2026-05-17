@@ -688,6 +688,11 @@ class RenderTradingChart extends RenderBox {
       }
       canvas.restore();
 
+      _paintChartEdgeFades(
+        canvas,
+        ui.Rect.fromLTWH(0, 0, size.width, size.height),
+      );
+
       // Axes (outside clip).
       AxesPainter.paintPriceAxis(
         canvas: canvas,
@@ -1000,6 +1005,79 @@ class RenderTradingChart extends RenderBox {
         ],
       );
     canvas.drawRect(fadeRect, paint);
+  }
+
+  void _paintChartEdgeFades(ui.Canvas canvas, ui.Rect chartRect) {
+    final fadeSize = _theme.edgeFadeSize;
+    if (fadeSize <= 0 || chartRect.isEmpty) return;
+
+    final size = fadeSize.clamp(0, chartRect.shortestSide / 2).toDouble();
+    final outerColor = _theme.edgeFadeOuterColor;
+    final innerColor = _theme.edgeFadeInnerColor;
+
+    final topRect = ui.Rect.fromLTRB(
+      chartRect.left,
+      chartRect.top,
+      chartRect.right,
+      chartRect.top + size,
+    );
+    canvas.drawRect(
+      topRect,
+      ui.Paint()
+        ..shader = ui.Gradient.linear(
+          topRect.topCenter,
+          topRect.bottomCenter,
+          [outerColor, innerColor],
+        ),
+    );
+
+    final bottomRect = ui.Rect.fromLTRB(
+      chartRect.left,
+      chartRect.bottom - size,
+      chartRect.right,
+      chartRect.bottom,
+    );
+    canvas.drawRect(
+      bottomRect,
+      ui.Paint()
+        ..shader = ui.Gradient.linear(
+          bottomRect.topCenter,
+          bottomRect.bottomCenter,
+          [innerColor, outerColor],
+        ),
+    );
+
+    final leftRect = ui.Rect.fromLTRB(
+      chartRect.left,
+      chartRect.top,
+      chartRect.left + size,
+      chartRect.bottom,
+    );
+    canvas.drawRect(
+      leftRect,
+      ui.Paint()
+        ..shader = ui.Gradient.linear(
+          leftRect.centerLeft,
+          leftRect.centerRight,
+          [outerColor, innerColor],
+        ),
+    );
+
+    final rightRect = ui.Rect.fromLTRB(
+      chartRect.right - size,
+      chartRect.top,
+      chartRect.right,
+      chartRect.bottom,
+    );
+    canvas.drawRect(
+      rightRect,
+      ui.Paint()
+        ..shader = ui.Gradient.linear(
+          rightRect.centerLeft,
+          rightRect.centerRight,
+          [innerColor, outerColor],
+        ),
+    );
   }
 
   // ───────── hit test ─────────
