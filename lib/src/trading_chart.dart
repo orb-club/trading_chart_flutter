@@ -11,6 +11,7 @@ import 'model/chart_pane.dart';
 import 'model/chart_theme.dart';
 import 'model/crosshair.dart';
 import 'model/last_value_label.dart';
+import 'model/plot_overlay.dart';
 import 'render/render_trading_chart.dart';
 import 'series/line_series.dart';
 
@@ -38,8 +39,10 @@ class TradingChart extends LeafRenderObjectWidget {
     this.showCrosshairOverlay = true,
     this.showOhlcLegend = true,
     this.showLastValueLabel = true,
+    this.showGrid = true,
     this.onCrosshairChanged,
     this.onLastValueLabelChanged,
+    this.onPlotOverlayChanged,
   });
 
   /// The full ordered list of bars to render. Times must be ascending.
@@ -95,11 +98,17 @@ class TradingChart extends LeafRenderObjectWidget {
   /// Whether the package paints its built-in latest-price label.
   final bool showLastValueLabel;
 
+  /// Whether the package paints its built-in plot grid.
+  final bool showGrid;
+
   /// Optional listener for externally painting app-specific crosshair UI.
   final TradingChartCrosshairChanged? onCrosshairChanged;
 
   /// Optional listener for externally positioning a latest-price label widget.
   final TradingChartLastValueLabelChanged? onLastValueLabelChanged;
+
+  /// Optional listener for externally positioning plot-aligned widgets.
+  final TradingChartPlotOverlayChanged? onPlotOverlayChanged;
 
   @override
   RenderTradingChart createRenderObject(BuildContext context) {
@@ -118,11 +127,13 @@ class TradingChart extends LeafRenderObjectWidget {
       showCrosshairOverlay: showCrosshairOverlay,
       showOhlcLegend: showOhlcLegend,
       showLastValueLabel: showLastValueLabel,
+      showGrid: showGrid,
     );
     r
       ..onVisibleRangeChanged = onVisibleRangeChanged
       ..onCrosshairChanged = onCrosshairChanged
-      ..onLastValueLabelChanged = onLastValueLabelChanged;
+      ..onLastValueLabelChanged = onLastValueLabelChanged
+      ..onPlotOverlayChanged = onPlotOverlayChanged;
     controller?.attach(r);
     return r;
   }
@@ -145,9 +156,11 @@ class TradingChart extends LeafRenderObjectWidget {
       ..showCrosshairOverlay = showCrosshairOverlay
       ..showOhlcLegend = showOhlcLegend
       ..showLastValueLabel = showLastValueLabel
+      ..showGrid = showGrid
       ..onVisibleRangeChanged = onVisibleRangeChanged
       ..onCrosshairChanged = onCrosshairChanged
-      ..onLastValueLabelChanged = onLastValueLabelChanged;
+      ..onLastValueLabelChanged = onLastValueLabelChanged
+      ..onPlotOverlayChanged = onPlotOverlayChanged;
     if (controller != null) controller!.attach(renderObject);
   }
 
@@ -191,6 +204,8 @@ class InteractiveTradingChart extends StatefulWidget {
     this.timeAxisHeight = 24,
     this.showCrosshairOverlay = true,
     this.showOhlcLegend = true,
+    this.showGrid = true,
+    this.gridBuilder,
     this.lastValueLabelBuilder,
     this.onCrosshairChanged,
   });
@@ -245,6 +260,15 @@ class InteractiveTradingChart extends StatefulWidget {
   /// Whether the package paints its built-in OHLC legend.
   final bool showOhlcLegend;
 
+  /// Whether the package paints its built-in plot grid.
+  ///
+  /// When [gridBuilder] is provided, the built-in grid is automatically
+  /// suppressed and the custom grid widget is positioned over the plot.
+  final bool showGrid;
+
+  /// Builds a custom grid widget positioned over the main plot area.
+  final TradingChartPlotOverlayBuilder? gridBuilder;
+
   /// Builds a custom latest-price label widget.
   ///
   /// When provided, the package owns the label position but does not paint the
@@ -263,7 +287,9 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     with TickerProviderStateMixin {
   final GlobalKey _chartKey = GlobalKey();
   TradingChartLastValueLabel? _lastValueLabel;
+  TradingChartPlotOverlay? _plotOverlay;
   bool _lastValueLabelUpdateScheduled = false;
+  bool _plotOverlayUpdateScheduled = false;
 
   RenderTradingChart? get _render =>
       _chartKey.currentContext?.findRenderObject() as RenderTradingChart?;
@@ -579,6 +605,9 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   @override
   Widget build(BuildContext context) {
     final lastValueLabelBuilder = widget.lastValueLabelBuilder;
+    final gridBuilder = widget.gridBuilder;
+    final plotOverlay = _plotOverlay;
+    final lastValueLabel = _lastValueLabel;
     final chart = TradingChart(
       key: _chartKey,
       candles: widget.candles,
@@ -596,25 +625,44 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
       timeAxisHeight: widget.timeAxisHeight,
       showCrosshairOverlay: widget.showCrosshairOverlay,
       showOhlcLegend: widget.showOhlcLegend,
+      showGrid: widget.showGrid && gridBuilder == null,
       showLastValueLabel: lastValueLabelBuilder == null,
       onCrosshairChanged: widget.onCrosshairChanged,
       onLastValueLabelChanged:
           lastValueLabelBuilder == null ? null : _handleLastValueLabelChanged,
+      onPlotOverlayChanged:
+          gridBuilder == null ? null : _handlePlotOverlayChanged,
     );
-    final child = lastValueLabelBuilder == null
+    final child = lastValueLabelBuilder == null && gridBuilder == null
         ? chart
         : Stack(
             fit: StackFit.expand,
             children: [
               chart,
-              if (_lastValueLabel case final label?)
+              if (gridBuilder != null && plotOverlay != null)
                 IgnorePointer(
                   child: CustomMultiChildLayout(
-                    delegate: _LastValueLabelLayoutDelegate(label),
+                    delegate: _ChartOverlayLayoutDelegate(
+                      plotOverlay: plotOverlay,
+                    ),
+                    children: [
+                      LayoutId(
+                        id: _ChartOverlaySlot.grid,
+                        child: gridBuilder(context, plotOverlay),
+                      ),
+                    ],
+                  ),
+                ),
+              if (lastValueLabelBuilder != null && lastValueLabel != null)
+                IgnorePointer(
+                  child: CustomMultiChildLayout(
+                    delegate: _ChartOverlayLayoutDelegate(
+                      lastValueLabel: lastValueLabel,
+                    ),
                     children: [
                       LayoutId(
                         id: _ChartOverlaySlot.lastValueLabel,
-                        child: lastValueLabelBuilder(context, label),
+                        child: lastValueLabelBuilder(context, lastValueLabel),
                       ),
                     ],
                   ),
@@ -661,21 +709,50 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
       setState(() => _lastValueLabel = label);
     });
   }
-}
 
-enum _ChartOverlaySlot { lastValueLabel }
-
-class _LastValueLabelLayoutDelegate extends MultiChildLayoutDelegate {
-  _LastValueLabelLayoutDelegate(this.label);
-
-  final TradingChartLastValueLabel label;
-
-  @override
-  void performLayout(Size size) {
-    if (!hasChild(_ChartOverlaySlot.lastValueLabel)) {
+  void _handlePlotOverlayChanged(TradingChartPlotOverlay overlay) {
+    if (_plotOverlay == overlay || _plotOverlayUpdateScheduled) {
       return;
     }
 
+    _plotOverlayUpdateScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _plotOverlayUpdateScheduled = false;
+      if (!mounted || _plotOverlay == overlay) {
+        return;
+      }
+
+      setState(() => _plotOverlay = overlay);
+    });
+  }
+}
+
+enum _ChartOverlaySlot { grid, lastValueLabel }
+
+class _ChartOverlayLayoutDelegate extends MultiChildLayoutDelegate {
+  _ChartOverlayLayoutDelegate({
+    this.plotOverlay,
+    this.lastValueLabel,
+  });
+
+  final TradingChartPlotOverlay? plotOverlay;
+  final TradingChartLastValueLabel? lastValueLabel;
+
+  @override
+  void performLayout(Size size) {
+    final plotOverlay = this.plotOverlay;
+    if (plotOverlay != null && hasChild(_ChartOverlaySlot.grid)) {
+      layoutChild(
+        _ChartOverlaySlot.grid,
+        BoxConstraints.tight(plotOverlay.plotRect.size),
+      );
+      positionChild(_ChartOverlaySlot.grid, plotOverlay.plotRect.topLeft);
+    }
+
+    final label = lastValueLabel;
+    if (label == null || !hasChild(_ChartOverlaySlot.lastValueLabel)) {
+      return;
+    }
     final childSize = layoutChild(
       _ChartOverlaySlot.lastValueLabel,
       BoxConstraints.loose(size),
@@ -696,7 +773,8 @@ class _LastValueLabelLayoutDelegate extends MultiChildLayoutDelegate {
   }
 
   @override
-  bool shouldRelayout(covariant _LastValueLabelLayoutDelegate oldDelegate) {
-    return oldDelegate.label != label;
+  bool shouldRelayout(covariant _ChartOverlayLayoutDelegate oldDelegate) {
+    return oldDelegate.plotOverlay != plotOverlay ||
+        oldDelegate.lastValueLabel != lastValueLabel;
   }
 }

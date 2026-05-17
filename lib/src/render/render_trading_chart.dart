@@ -6,6 +6,7 @@ import '../model/candle.dart';
 import '../model/chart_theme.dart';
 import '../model/crosshair.dart';
 import '../model/last_value_label.dart';
+import '../model/plot_overlay.dart';
 import '../scale/price_scale.dart';
 import '../scale/time_scale.dart';
 import '../chart_controller.dart';
@@ -36,6 +37,7 @@ class RenderTradingChart extends RenderBox {
     bool showCrosshairOverlay = true,
     bool showOhlcLegend = true,
     bool showLastValueLabel = true,
+    bool showGrid = true,
   })  : _candles = candles,
         _theme = theme,
         _showVolume = showVolume,
@@ -47,6 +49,7 @@ class RenderTradingChart extends RenderBox {
         _showCrosshairOverlay = showCrosshairOverlay,
         _showOhlcLegend = showOhlcLegend,
         _showLastValueLabel = showLastValueLabel,
+        _showGrid = showGrid,
         _paneScales = List.generate(panes.length, (_) => PriceScale()),
         _timeScale = TimeScale(
           dataLength: candles.length,
@@ -154,6 +157,14 @@ class RenderTradingChart extends RenderBox {
   set showLastValueLabel(bool v) {
     if (_showLastValueLabel == v) return;
     _showLastValueLabel = v;
+    markNeedsPaint();
+  }
+
+  bool _showGrid;
+  bool get showGrid => _showGrid;
+  set showGrid(bool v) {
+    if (_showGrid == v) return;
+    _showGrid = v;
     markNeedsPaint();
   }
 
@@ -381,6 +392,9 @@ class RenderTradingChart extends RenderBox {
   /// Listener invoked whenever the latest-price label position changes.
   TradingChartLastValueLabelChanged? onLastValueLabelChanged;
 
+  /// Listener invoked whenever the chart plot layout changes.
+  TradingChartPlotOverlayChanged? onPlotOverlayChanged;
+
   /// Set crosshair position in local coordinates (relative to render box origin).
   /// Pass null to hide.
   void setCrosshair(Offset? local) {
@@ -415,6 +429,14 @@ class RenderTradingChart extends RenderBox {
     if (_lastValueLabel == label) return;
     _lastValueLabel = label;
     onLastValueLabelChanged?.call(label);
+  }
+
+  TradingChartPlotOverlay? _plotOverlay;
+
+  void _notifyPlotOverlayChanged(TradingChartPlotOverlay overlay) {
+    if (_plotOverlay == overlay) return;
+    _plotOverlay = overlay;
+    onPlotOverlayChanged?.call(overlay);
   }
 
   // ───────── layout ─────────
@@ -520,6 +542,13 @@ class RenderTradingChart extends RenderBox {
       _plotWidth,
       _timeAxisHeight,
     );
+    _notifyPlotOverlayChanged(
+      TradingChartPlotOverlay(
+        plotRect: plotRect,
+        priceAxisRect: priceAxisRect,
+        timeAxisRect: timeAxisRect,
+      ),
+    );
 
     // Background
     canvas.drawRect(
@@ -589,13 +618,15 @@ class RenderTradingChart extends RenderBox {
       // Grid behind series.
       canvas.save();
       canvas.clipRect(plotRect);
-      AxesPainter.paintGrid(
-        canvas: canvas,
-        plotRect: plotRect,
-        theme: _theme,
-        priceTicks: priceTicks,
-        timeTicks: timeTicks,
-      );
+      if (_showGrid) {
+        AxesPainter.paintGrid(
+          canvas: canvas,
+          plotRect: plotRect,
+          theme: _theme,
+          priceTicks: priceTicks,
+          timeTicks: timeTicks,
+        );
+      }
       // Volume bars under candles (so candles win the visual stack
       // for overlap, but the bars stay readable thanks to opacity).
       if (_showVolume) {

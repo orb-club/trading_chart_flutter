@@ -30,8 +30,7 @@ Widget _wrap(Widget child, {Size size = const Size(800, 400)}) {
 
 void main() {
   group('TradingChart (static)', () {
-    testWidgets('renders without throwing for a normal series',
-        (tester) async {
+    testWidgets('renders without throwing for a normal series', (tester) async {
       await tester.pumpWidget(_wrap(TradingChart(candles: _series())));
       expect(tester.takeException(), isNull);
     });
@@ -86,6 +85,29 @@ void main() {
       // Range should reflect the buffered 30-candle series, not empty data.
       final r = controller.visibleLogicalRange!;
       expect(r.to, greaterThan(0));
+    });
+
+    testWidgets('custom grid builder is positioned over the plot',
+        (tester) async {
+      const gridKey = Key('custom_grid');
+      TradingChartPlotOverlay? overlay;
+
+      await tester.pumpWidget(
+        _wrap(
+          InteractiveTradingChart(
+            candles: _series(),
+            gridBuilder: (context, plotOverlay) {
+              overlay = plotOverlay;
+              return const SizedBox(key: gridKey);
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(gridKey), findsOneWidget);
+      expect(overlay, isNotNull);
+      expect(tester.getSize(find.byKey(gridKey)), overlay!.plotRect.size);
     });
 
     testWidgets('onVisibleRangeChanged fires after pan changes the range',
