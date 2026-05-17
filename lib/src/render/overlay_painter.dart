@@ -41,7 +41,7 @@ class OverlayPainter {
       canvas: canvas,
       axisRect: priceAxisRect,
       y: y,
-      text: NiceTicks.formatPrice(lastCandle.close, priceStep),
+      text: _formatUsdPrice(lastCandle.close, priceStep),
       bg: theme.lastValueLabelBg,
       fg: theme.lastValueLabelText,
       fontSize: theme.axisFontSize,
@@ -100,7 +100,7 @@ class OverlayPainter {
       canvas: canvas,
       axisRect: priceAxisRect,
       y: cy,
-      text: NiceTicks.formatPrice(price, priceStep),
+      text: _formatUsdPrice(price, priceStep),
       bg: theme.crosshairLabelBg,
       fg: theme.crosshairLabelText,
       fontSize: theme.axisFontSize,
@@ -167,7 +167,7 @@ class OverlayPainter {
       canvas: canvas,
       axisRect: priceAxisRect,
       y: cy,
-      text: NiceTicks.formatPrice(value, valueStep),
+      text: _formatUsdPrice(value, valueStep),
       bg: theme.crosshairLabelBg,
       fg: theme.crosshairLabelText,
       fontSize: theme.axisFontSize,
@@ -250,26 +250,27 @@ class OverlayPainter {
     required ui.Color fg,
     required double fontSize,
   }) {
+    const height = 16.0;
+    const padX = 6.0;
+    const padY = 2.0;
     final tp = TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
           color: fg,
           fontSize: fontSize,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    const padX = 8.0;
-    const padY = 4.0;
     final w = tp.width + padX * 2;
-    final h = tp.height + padY * 2;
-    final left = axisRect.left + 1;
-    final top = (y - h / 2).clamp(axisRect.top, axisRect.bottom - h);
+    final left = (axisRect.right - w - 1) < 0 ? 0.0 : axisRect.right - w - 1;
+    final top = (y - height / 2).clamp(axisRect.top, axisRect.bottom - height);
     final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(left, top, w, h),
-      const Radius.circular(8),
+      Rect.fromLTWH(left, top, w, height),
+      const Radius.circular(90),
     );
     canvas.drawRRect(rect, ui.Paint()..color = bg);
     tp.paint(canvas, Offset(left + padX, top + padY));
@@ -284,21 +285,29 @@ class OverlayPainter {
     required ui.Color fg,
     required double fontSize,
   }) {
+    const height = 16.0;
+    const padX = 6.0;
+    const padY = 2.0;
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(color: fg, fontSize: fontSize),
+        style: TextStyle(
+          color: fg,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    const padX = 6.0;
-    const padY = 3.0;
     final w = tp.width + padX * 2;
-    final h = tp.height + padY * 2;
     final left = (x - w / 2).clamp(axisRect.left, axisRect.right - w);
     final top = axisRect.top + 1;
-    final rect = Rect.fromLTWH(left, top, w, h);
-    canvas.drawRect(rect, ui.Paint()..color = bg);
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(left, top, w, height),
+      const Radius.circular(90),
+    );
+    canvas.drawRRect(rect, ui.Paint()..color = bg);
     tp.paint(canvas, Offset(left + padX, top + padY));
   }
 
@@ -343,6 +352,32 @@ class OverlayPainter {
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
     return '$y-$m-$d $hh:$mm';
+  }
+
+  static String _formatUsdPrice(double value, double step) {
+    final formatted = NiceTicks.formatPrice(value.abs(), step);
+    final decimalIndex = formatted.indexOf('.');
+    final integerPart =
+        decimalIndex == -1 ? formatted : formatted.substring(0, decimalIndex);
+    final fractionalPart =
+        decimalIndex == -1 ? '' : formatted.substring(decimalIndex);
+    final withSeparators = _formatThousands(integerPart);
+    final sign = value < 0 ? '-' : '';
+
+    return '$sign\$$withSeparators$fractionalPart';
+  }
+
+  static String _formatThousands(String value) {
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < value.length; i++) {
+      if (i > 0 && (value.length - i) % 3 == 0) {
+        buffer.write(',');
+      }
+      buffer.write(value[i]);
+    }
+
+    return buffer.toString();
   }
 }
 
