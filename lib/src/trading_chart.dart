@@ -5,10 +5,11 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import 'chart_controller.dart';
-import 'model/bar_marker.dart';
 import 'model/candle.dart';
+import 'model/bar_marker.dart';
 import 'model/chart_pane.dart';
 import 'model/chart_theme.dart';
+import 'model/crosshair.dart';
 import 'render/render_trading_chart.dart';
 import 'series/line_series.dart';
 
@@ -31,6 +32,11 @@ class TradingChart extends LeafRenderObjectWidget {
     this.controller,
     this.onVisibleRangeChanged,
     this.logarithmicPriceScale = false,
+    this.priceAxisWidth = 64,
+    this.timeAxisHeight = 24,
+    this.showCrosshairOverlay = true,
+    this.showOhlcLegend = true,
+    this.onCrosshairChanged,
   });
 
   /// The full ordered list of bars to render. Times must be ascending.
@@ -71,6 +77,21 @@ class TradingChart extends LeafRenderObjectWidget {
   /// the visible minimum is non-positive.
   final bool logarithmicPriceScale;
 
+  /// Width reserved for the right-side price axis.
+  final double priceAxisWidth;
+
+  /// Height reserved for the bottom time axis.
+  final double timeAxisHeight;
+
+  /// Whether the package paints its built-in crosshair labels and guide lines.
+  final bool showCrosshairOverlay;
+
+  /// Whether the package paints its built-in OHLC legend.
+  final bool showOhlcLegend;
+
+  /// Optional listener for externally painting app-specific crosshair UI.
+  final TradingChartCrosshairChanged? onCrosshairChanged;
+
   @override
   RenderTradingChart createRenderObject(BuildContext context) {
     final r = RenderTradingChart(
@@ -83,8 +104,14 @@ class TradingChart extends LeafRenderObjectWidget {
       panes: panes,
       markers: markers,
       logarithmicPriceScale: logarithmicPriceScale,
+      priceAxisWidth: priceAxisWidth,
+      timeAxisHeight: timeAxisHeight,
+      showCrosshairOverlay: showCrosshairOverlay,
+      showOhlcLegend: showOhlcLegend,
     );
-    r.onVisibleRangeChanged = onVisibleRangeChanged;
+    r
+      ..onVisibleRangeChanged = onVisibleRangeChanged
+      ..onCrosshairChanged = onCrosshairChanged;
     controller?.attach(r);
     return r;
   }
@@ -102,7 +129,12 @@ class TradingChart extends LeafRenderObjectWidget {
       ..panes = panes
       ..markers = markers
       ..logarithmicPriceScale = logarithmicPriceScale
-      ..onVisibleRangeChanged = onVisibleRangeChanged;
+      ..priceAxisWidth = priceAxisWidth
+      ..timeAxisHeight = timeAxisHeight
+      ..showCrosshairOverlay = showCrosshairOverlay
+      ..showOhlcLegend = showOhlcLegend
+      ..onVisibleRangeChanged = onVisibleRangeChanged
+      ..onCrosshairChanged = onCrosshairChanged;
     if (controller != null) controller!.attach(renderObject);
   }
 
@@ -142,6 +174,11 @@ class InteractiveTradingChart extends StatefulWidget {
     this.controller,
     this.onVisibleRangeChanged,
     this.logarithmicPriceScale = false,
+    this.priceAxisWidth = 64,
+    this.timeAxisHeight = 24,
+    this.showCrosshairOverlay = true,
+    this.showOhlcLegend = true,
+    this.onCrosshairChanged,
   });
 
   /// The full ordered list of bars to render. Times must be ascending.
@@ -181,6 +218,21 @@ class InteractiveTradingChart extends StatefulWidget {
   /// percentage moves take equal screen distance. Falls back to linear when
   /// the visible minimum is non-positive.
   final bool logarithmicPriceScale;
+
+  /// Width reserved for the right-side price axis.
+  final double priceAxisWidth;
+
+  /// Height reserved for the bottom time axis.
+  final double timeAxisHeight;
+
+  /// Whether the package paints its built-in crosshair labels and guide lines.
+  final bool showCrosshairOverlay;
+
+  /// Whether the package paints its built-in OHLC legend.
+  final bool showOhlcLegend;
+
+  /// Optional listener for externally painting app-specific crosshair UI.
+  final TradingChartCrosshairChanged? onCrosshairChanged;
 
   @override
   State<InteractiveTradingChart> createState() =>
@@ -535,6 +587,11 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
             controller: widget.controller,
             onVisibleRangeChanged: widget.onVisibleRangeChanged,
             logarithmicPriceScale: widget.logarithmicPriceScale,
+            priceAxisWidth: widget.priceAxisWidth,
+            timeAxisHeight: widget.timeAxisHeight,
+            showCrosshairOverlay: widget.showCrosshairOverlay,
+            showOhlcLegend: widget.showOhlcLegend,
+            onCrosshairChanged: widget.onCrosshairChanged,
           ),
         ),
       ),

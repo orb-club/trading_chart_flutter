@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 
 import '../model/candle.dart';
 import '../model/chart_theme.dart';
+import '../model/crosshair.dart';
 import '../scale/price_scale.dart';
 import '../scale/time_scale.dart';
 import '../chart_controller.dart';
@@ -29,12 +30,20 @@ class RenderTradingChart extends RenderBox {
     List<ChartPane> panes = const [],
     List<BarMarker> markers = const [],
     bool logarithmicPriceScale = false,
+    double priceAxisWidth = 64,
+    double timeAxisHeight = 24,
+    bool showCrosshairOverlay = true,
+    bool showOhlcLegend = true,
   })  : _candles = candles,
         _theme = theme,
         _showVolume = showVolume,
         _overlays = overlays,
         _panes = panes,
         _markers = markers,
+        _priceAxisWidth = priceAxisWidth,
+        _timeAxisHeight = timeAxisHeight,
+        _showCrosshairOverlay = showCrosshairOverlay,
+        _showOhlcLegend = showOhlcLegend,
         _paneScales = List.generate(panes.length, (_) => PriceScale()),
         _timeScale = TimeScale(
           dataLength: candles.length,
@@ -102,6 +111,38 @@ class RenderTradingChart extends RenderBox {
   set markers(List<BarMarker> v) {
     if (identical(_markers, v)) return;
     _markers = v;
+    markNeedsPaint();
+  }
+
+  double _priceAxisWidth;
+  double get priceAxisWidth => _priceAxisWidth;
+  set priceAxisWidth(double v) {
+    if (_priceAxisWidth == v) return;
+    _priceAxisWidth = v;
+    markNeedsLayout();
+  }
+
+  double _timeAxisHeight;
+  double get timeAxisHeight => _timeAxisHeight;
+  set timeAxisHeight(double v) {
+    if (_timeAxisHeight == v) return;
+    _timeAxisHeight = v;
+    markNeedsLayout();
+  }
+
+  bool _showCrosshairOverlay;
+  bool get showCrosshairOverlay => _showCrosshairOverlay;
+  set showCrosshairOverlay(bool v) {
+    if (_showCrosshairOverlay == v) return;
+    _showCrosshairOverlay = v;
+    markNeedsPaint();
+  }
+
+  bool _showOhlcLegend;
+  bool get showOhlcLegend => _showOhlcLegend;
+  set showOhlcLegend(bool v) {
+    if (_showOhlcLegend == v) return;
+    _showOhlcLegend = v;
     markNeedsPaint();
   }
 
@@ -323,20 +364,43 @@ class RenderTradingChart extends RenderBox {
 
   Offset? _crosshair;
 
+  /// Listener invoked whenever the crosshair target changes.
+  TradingChartCrosshairChanged? onCrosshairChanged;
+
   /// Set crosshair position in local coordinates (relative to render box origin).
   /// Pass null to hide.
   void setCrosshair(Offset? local) {
     if (_crosshair == local) return;
     _crosshair = local;
+    _notifyCrosshairChanged(local);
     markNeedsPaint();
+  }
+
+  void _notifyCrosshairChanged(Offset? local) {
+    final cb = onCrosshairChanged;
+    if (cb == null) return;
+    if (local == null || _candles.isEmpty || !hasSize || _plotWidth <= 0) {
+      cb(null, null, null);
+      return;
+    }
+    if (local.dx < 0 || local.dx > _plotWidth) {
+      cb(null, null, null);
+      return;
+    }
+
+    final idxF = _timeScale.xToIndex(local.dx, _plotWidth);
+    final idx = idxF.round().clamp(0, _candles.length - 1);
+    final price =
+        local.dy < 0 || local.dy > mainPlotHeight ? null : priceForY(local.dy);
+    cb(local, idx, _candles[idx], price);
   }
 
   // ───────── layout ─────────
 
   double get _plotWidth =>
-      (size.width - AxesPainter.priceAxisWidth).clamp(0.0, double.infinity);
+      (size.width - _priceAxisWidth).clamp(0.0, double.infinity);
   double get _plotHeight =>
-      (size.height - AxesPainter.timeAxisHeight).clamp(0.0, double.infinity);
+      (size.height - _timeAxisHeight).clamp(0.0, double.infinity);
 
   /// 1px gap between adjacent panes for a visual separator line.
   static const double _paneSeparatorPx = 1;
@@ -425,14 +489,14 @@ class RenderTradingChart extends RenderBox {
     final priceAxisRect = ui.Rect.fromLTWH(
       _plotWidth,
       0,
-      AxesPainter.priceAxisWidth,
+      _priceAxisWidth,
       plotRect.height,
     );
     final timeAxisRect = ui.Rect.fromLTWH(
       0,
       _plotHeight,
       _plotWidth,
-      AxesPainter.timeAxisHeight,
+      _timeAxisHeight,
     );
 
     // Background
@@ -569,7 +633,7 @@ class RenderTradingChart extends RenderBox {
           hoverCandle = _candles[idx];
         }
       }
-      if (hoverCandle != null && crosshairInMain) {
+      if (_showCrosshairOverlay && hoverCandle != null && crosshairInMain) {
         OverlayPainter.paintCrosshair(
           canvas: canvas,
           plotRect: plotRect,
@@ -612,7 +676,7 @@ class RenderTradingChart extends RenderBox {
       );
 
       // Crosshair badges over axes (main pane only).
-      if (hoverCandle != null && crosshairInMain) {
+      if (_showCrosshairOverlay && hoverCandle != null && crosshairInMain) {
         OverlayPainter.paintCrosshair(
           canvas: canvas,
           plotRect: plotRect,
@@ -628,14 +692,16 @@ class RenderTradingChart extends RenderBox {
         );
       }
 
-      // OHLC legend (top-left). Show hovered candle, otherwise last.
-      OverlayPainter.paintOhlcLegend(
-        canvas: canvas,
-        plotRect: plotRect,
-        theme: _theme,
-        candle: hoverCandle ?? _candles.last,
-        priceStep: priceStep,
-      );
+      if (_showOhlcLegend) {
+        // OHLC legend (top-left). Show hovered candle, otherwise last.
+        OverlayPainter.paintOhlcLegend(
+          canvas: canvas,
+          plotRect: plotRect,
+          theme: _theme,
+          candle: hoverCandle ?? _candles.last,
+          priceStep: priceStep,
+        );
+      }
 
       // ───── extra panes ─────
       for (var i = 0; i < _panes.length; i++) {
@@ -665,7 +731,7 @@ class RenderTradingChart extends RenderBox {
 
       // Time-axis crosshair vertical line spans all panes (drawn after panes
       // so it sits on top of pane content but under the bottom time axis).
-      if (hoverCandle != null && hoverIndex != null) {
+      if (_showCrosshairOverlay && hoverCandle != null && hoverIndex != null) {
         canvas.save();
         canvas.clipRect(ui.Rect.fromLTWH(0, 0, _plotWidth, _plotHeight));
         OverlayPainter.paintCrosshairVertical(
