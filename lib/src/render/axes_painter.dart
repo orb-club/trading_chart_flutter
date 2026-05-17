@@ -77,12 +77,17 @@ class AxesPainter {
     final spacing = theme.gridDotSpacing;
     if (spacing <= 0) return;
 
+    final dotPaint = ui.Paint()
+      ..color = paint.color
+      ..strokeWidth = theme.gridDotRadius
+      ..strokeCap = ui.StrokeCap.round;
     var x = fromX;
     while (x <= toX) {
-      canvas.drawCircle(
-        ui.Offset(x.roundToDouble() + 0.5, y),
-        theme.gridDotRadius,
-        paint,
+      final startX = x.roundToDouble() + 0.5;
+      canvas.drawLine(
+        ui.Offset(startX, y),
+        ui.Offset((startX + 1).clamp(startX, toX).toDouble(), y),
+        dotPaint,
       );
       x += spacing;
     }
@@ -99,12 +104,17 @@ class AxesPainter {
     final spacing = theme.gridDotSpacing;
     if (spacing <= 0) return;
 
+    final dotPaint = ui.Paint()
+      ..color = paint.color
+      ..strokeWidth = theme.gridDotRadius
+      ..strokeCap = ui.StrokeCap.round;
     var y = fromY;
     while (y <= toY) {
-      canvas.drawCircle(
-        ui.Offset(x, y.roundToDouble() + 0.5),
-        theme.gridDotRadius,
-        paint,
+      final startY = y.roundToDouble() + 0.5;
+      canvas.drawLine(
+        ui.Offset(x, startY),
+        ui.Offset(x, (startY + 1).clamp(startY, toY).toDouble()),
+        dotPaint,
       );
       y += spacing;
     }
