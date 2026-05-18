@@ -638,7 +638,6 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
         : Stack(
             fit: StackFit.expand,
             children: [
-              chart,
               if (gridBuilder != null && plotOverlay != null)
                 IgnorePointer(
                   child: CustomMultiChildLayout(
@@ -653,6 +652,7 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
                     ],
                   ),
                 ),
+              chart,
               if (lastValueLabelBuilder != null && lastValueLabel != null)
                 IgnorePointer(
                   child: CustomMultiChildLayout(
