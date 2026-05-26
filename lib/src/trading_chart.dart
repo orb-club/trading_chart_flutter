@@ -327,8 +327,11 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
   int? _tapCrosshairPointer;
   Offset? _tapCrosshairStart;
+  Offset? _tapCrosshairLastPosition;
   Offset? _tapCrosshairPosition;
   Timer? _tapCrosshairTimer;
+  VelocityTracker? _tapCrosshairVelocity;
+  bool _tapCrosshairPanActive = false;
 
   static const _tapCrosshairDelay = Duration(milliseconds: 80);
 
@@ -516,7 +519,11 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     _stopFling();
     _tapCrosshairPointer = e.pointer;
     _tapCrosshairStart = e.localPosition;
+    _tapCrosshairLastPosition = e.localPosition;
     _tapCrosshairPosition = e.localPosition;
+    _tapCrosshairPanActive = false;
+    _tapCrosshairVelocity = VelocityTracker.withKind(e.kind)
+      ..addPosition(Duration.zero, e.localPosition);
     _tapCrosshairTimer?.cancel();
     _tapCrosshairTimer = Timer(
       _tapCrosshairDelay,
@@ -527,18 +534,41 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   void _onPointerMove(PointerMoveEvent e) {
     if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
     if (_tapCrosshairPointer != e.pointer) return;
+    _tapCrosshairVelocity?.addPosition(e.timeStamp, e.localPosition);
     _tapCrosshairPosition = e.localPosition;
-    if (!_crosshairActive &&
-        _shouldCancelPendingTapCrosshair(e.localPosition)) {
-      _cancelPendingTapCrosshair();
+
+    if (_tapCrosshairPanActive) {
+      _panTapCrosshairGesture(e.localPosition);
       return;
     }
+
+    if (!_crosshairActive &&
+        _shouldCancelPendingTapCrosshair(e.localPosition)) {
+      final start = _tapCrosshairStart;
+      if (start == null) {
+        _cancelPendingTapCrosshair();
+        return;
+      }
+
+      final offset = e.localPosition - start;
+      _tapCrosshairTimer?.cancel();
+      _tapCrosshairTimer = null;
+      if (offset.dx.abs() >= offset.dy.abs()) {
+        _tapCrosshairPanActive = true;
+        _panTapCrosshairGesture(e.localPosition);
+      } else {
+        _cancelPendingTapCrosshair();
+      }
+      return;
+    }
+
     if (_crosshairActive) _render?.setCrosshair(e.localPosition);
   }
 
   void _onPointerUp(PointerUpEvent e) {
     if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
     if (_tapCrosshairPointer != e.pointer) return;
+    if (_tapCrosshairPanActive) _flingTapCrosshairPan();
     _cancelPendingTapCrosshair();
     _clearCrosshair();
   }
@@ -561,13 +591,31 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     _tapCrosshairTimer = null;
     _tapCrosshairPointer = null;
     _tapCrosshairStart = null;
+    _tapCrosshairLastPosition = null;
     _tapCrosshairPosition = null;
+    _tapCrosshairVelocity = null;
+    _tapCrosshairPanActive = false;
   }
 
   bool _shouldCancelPendingTapCrosshair(Offset localPosition) {
     final start = _tapCrosshairStart;
     if (start == null) return false;
     return (localPosition - start).distance > kTouchSlop;
+  }
+
+  void _panTapCrosshairGesture(Offset localPosition) {
+    final previous = _tapCrosshairLastPosition;
+    _tapCrosshairLastPosition = localPosition;
+    if (previous == null) return;
+    final dx = localPosition.dx - previous.dx;
+    if (dx == 0) return;
+    _render?.panByPixels(dx);
+  }
+
+  void _flingTapCrosshairPan() {
+    final v = _tapCrosshairVelocity?.getVelocity().pixelsPerSecond.dx ?? 0;
+    if (v.abs() < 200) return;
+    _startFling(v);
   }
 
   void _animateZoomTo({required Offset anchor, required double newSpacing}) {
@@ -795,12 +843,29 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
           behavior: HitTestBehavior.opaque,
           onTapDown: _onTapDown,
           onDoubleTap: _onDoubleTap,
-          onScaleStart: _onScaleStart,
-          onScaleUpdate: _onScaleUpdate,
-          onScaleEnd: _onScaleEnd,
-          onLongPressStart: _onLongPressStart,
-          onLongPressMoveUpdate: _onLongPressMove,
-          onLongPressEnd: _onLongPressEnd,
+          onScaleStart:
+              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
+                  ? null
+                  : _onScaleStart,
+          onScaleUpdate:
+              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
+                  ? null
+                  : _onScaleUpdate,
+          onScaleEnd: widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
+              ? null
+              : _onScaleEnd,
+          onLongPressStart:
+              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
+                  ? null
+                  : _onLongPressStart,
+          onLongPressMoveUpdate:
+              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
+                  ? null
+                  : _onLongPressMove,
+          onLongPressEnd:
+              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
+                  ? null
+                  : _onLongPressEnd,
           child: child,
         ),
       ),

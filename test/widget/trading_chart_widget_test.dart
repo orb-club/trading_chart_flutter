@@ -262,6 +262,34 @@ void main() {
       expect(crosshairEvents.whereType<Offset>(), isEmpty);
     });
 
+    testWidgets('tapAndDrag crosshair mode ignores vertical scroll drags',
+        (tester) async {
+      final controller = ChartController();
+      addTearDown(controller.dispose);
+      final crosshairEvents = <Offset?>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          InteractiveTradingChart(
+            candles: _series(n: 500),
+            controller: controller,
+            touchCrosshairMode: TouchCrosshairMode.tapAndDrag,
+            onCrosshairChanged: (position, dataIndex, candle, [price]) {
+              crosshairEvents.add(position);
+            },
+          ),
+        ),
+      );
+      final before = controller.visibleLogicalRange!;
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      await tester.dragFrom(center, const Offset(0, 200));
+      await tester.pumpAndSettle();
+
+      expect(controller.visibleLogicalRange, before);
+      expect(crosshairEvents.whereType<Offset>(), isEmpty);
+    });
+
     testWidgets('default longPress crosshair mode ignores tap', (tester) async {
       final crosshairEvents = <Offset?>[];
 
