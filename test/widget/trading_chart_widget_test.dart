@@ -290,6 +290,79 @@ void main() {
       expect(crosshairEvents.whereType<Offset>(), isEmpty);
     });
 
+    testWidgets('tapAndDrag crosshair mode lets parent scroll before hover',
+        (tester) async {
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          ListView(
+            controller: scrollController,
+            children: [
+              const SizedBox(height: 80),
+              SizedBox(
+                height: 300,
+                child: InteractiveTradingChart(
+                  candles: _series(n: 500),
+                  touchCrosshairMode: TouchCrosshairMode.tapAndDrag,
+                ),
+              ),
+              const SizedBox(height: 1000),
+            ],
+          ),
+          size: const Size(800, 600),
+        ),
+      );
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      await tester.dragFrom(center, const Offset(0, -200));
+      await tester.pumpAndSettle();
+
+      expect(scrollController.offset, greaterThan(0));
+    });
+
+    testWidgets('tapAndDrag crosshair mode blocks parent scroll while hovering',
+        (tester) async {
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
+      final crosshairEvents = <Offset?>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          ListView(
+            controller: scrollController,
+            children: [
+              const SizedBox(height: 80),
+              SizedBox(
+                height: 300,
+                child: InteractiveTradingChart(
+                  candles: _series(n: 500),
+                  touchCrosshairMode: TouchCrosshairMode.tapAndDrag,
+                  onCrosshairChanged: (position, dataIndex, candle, [price]) {
+                    crosshairEvents.add(position);
+                  },
+                ),
+              ),
+              const SizedBox(height: 1000),
+            ],
+          ),
+          size: const Size(800, 600),
+        ),
+      );
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      final gesture = await tester.startGesture(center);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveBy(const Offset(0, -200));
+      await tester.pumpAndSettle();
+
+      expect(scrollController.offset, 0);
+      expect(crosshairEvents.whereType<Offset>(), isNotEmpty);
+
+      await gesture.up();
+    });
+
     testWidgets('default longPress crosshair mode ignores tap', (tester) async {
       final crosshairEvents = <Offset?>[];
 

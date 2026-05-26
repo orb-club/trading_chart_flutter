@@ -326,14 +326,9 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   VelocityTracker? _panVelocity;
 
   int? _tapCrosshairPointer;
-  Offset? _tapCrosshairStart;
   Offset? _tapCrosshairLastPosition;
-  Offset? _tapCrosshairPosition;
-  Timer? _tapCrosshairTimer;
   VelocityTracker? _tapCrosshairVelocity;
   bool _tapCrosshairPanActive = false;
-
-  static const _tapCrosshairDelay = Duration(milliseconds: 80);
 
   @override
   void initState() {
@@ -346,7 +341,6 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
   @override
   void dispose() {
-    _tapCrosshairTimer?.cancel();
     _flingTicker?.dispose();
     _wheelAnim?.dispose();
     super.dispose();
@@ -507,100 +501,61 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     _animateZoomTo(anchor: e.localPosition, newSpacing: desired);
   }
 
-  void _onPointerDown(PointerDownEvent e) {
-    if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
+  bool _canStartTapCrosshairGesture(Offset localPosition) {
     final r = _render;
-    if (r == null) return;
-    if (!r.isOverPlot(e.localPosition)) {
-      _clearCrosshair();
-      return;
-    }
+    return r != null && r.isOverPlot(localPosition);
+  }
 
+  void _onTapCrosshairGestureStart(PointerDownEvent e) {
     _stopFling();
     _tapCrosshairPointer = e.pointer;
-    _tapCrosshairStart = e.localPosition;
     _tapCrosshairLastPosition = e.localPosition;
-    _tapCrosshairPosition = e.localPosition;
     _tapCrosshairPanActive = false;
     _tapCrosshairVelocity = VelocityTracker.withKind(e.kind)
       ..addPosition(Duration.zero, e.localPosition);
-    _tapCrosshairTimer?.cancel();
-    _tapCrosshairTimer = Timer(
-      _tapCrosshairDelay,
-      _activateTapCrosshair,
-    );
   }
 
-  void _onPointerMove(PointerMoveEvent e) {
-    if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
+  void _onTapCrosshairHoverStart(Offset localPosition) {
+    final r = _render;
+    if (r == null || !r.isOverPlot(localPosition)) {
+      _clearTapCrosshairGestureState();
+      return;
+    }
+
+    _crosshairActive = true;
+    _crosshairScaleActive = true;
+    r.setCrosshair(localPosition);
+  }
+
+  void _onTapCrosshairHoverUpdate(PointerMoveEvent e) {
     if (_tapCrosshairPointer != e.pointer) return;
     _tapCrosshairVelocity?.addPosition(e.timeStamp, e.localPosition);
-    _tapCrosshairPosition = e.localPosition;
-
-    if (_tapCrosshairPanActive) {
-      _panTapCrosshairGesture(e.localPosition);
-      return;
-    }
-
-    if (!_crosshairActive &&
-        _shouldCancelPendingTapCrosshair(e.localPosition)) {
-      final start = _tapCrosshairStart;
-      if (start == null) {
-        _cancelPendingTapCrosshair();
-        return;
-      }
-
-      final offset = e.localPosition - start;
-      _tapCrosshairTimer?.cancel();
-      _tapCrosshairTimer = null;
-      if (offset.dx.abs() >= offset.dy.abs()) {
-        _tapCrosshairPanActive = true;
-        _panTapCrosshairGesture(e.localPosition);
-      } else {
-        _cancelPendingTapCrosshair();
-      }
-      return;
-    }
-
-    if (_crosshairActive) _render?.setCrosshair(e.localPosition);
+    _render?.setCrosshair(e.localPosition);
   }
 
-  void _onPointerUp(PointerUpEvent e) {
-    if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
+  void _onTapCrosshairPanUpdate(PointerMoveEvent e) {
     if (_tapCrosshairPointer != e.pointer) return;
+    _tapCrosshairPanActive = true;
+    _tapCrosshairVelocity?.addPosition(e.timeStamp, e.localPosition);
+    _panTapCrosshairGesture(e.localPosition);
+  }
+
+  void _onTapCrosshairGestureEnd() {
     if (_tapCrosshairPanActive) _flingTapCrosshairPan();
-    _cancelPendingTapCrosshair();
+    _clearTapCrosshairGestureState();
     _clearCrosshair();
   }
 
-  void _activateTapCrosshair() {
-    _tapCrosshairTimer = null;
-    final r = _render;
-    final position = _tapCrosshairPosition;
-    if (r == null || position == null || !r.isOverPlot(position)) {
-      _cancelPendingTapCrosshair();
-      return;
-    }
-    _crosshairActive = true;
-    _crosshairScaleActive = true;
-    r.setCrosshair(position);
+  void _onTapCrosshairGestureCancel() {
+    _clearTapCrosshairGestureState();
+    _clearCrosshair();
   }
 
-  void _cancelPendingTapCrosshair() {
-    _tapCrosshairTimer?.cancel();
-    _tapCrosshairTimer = null;
+  void _clearTapCrosshairGestureState() {
     _tapCrosshairPointer = null;
-    _tapCrosshairStart = null;
     _tapCrosshairLastPosition = null;
-    _tapCrosshairPosition = null;
     _tapCrosshairVelocity = null;
     _tapCrosshairPanActive = false;
-  }
-
-  bool _shouldCancelPendingTapCrosshair(Offset localPosition) {
-    final start = _tapCrosshairStart;
-    if (start == null) return false;
-    return (localPosition - start).distance > kTouchSlop;
   }
 
   void _panTapCrosshairGesture(Offset localPosition) {
@@ -723,7 +678,7 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   }
 
   void _onPointerCancel(PointerCancelEvent e) {
-    _cancelPendingTapCrosshair();
+    _clearTapCrosshairGestureState();
     _clearCrosshair();
   }
 
@@ -827,47 +782,51 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
             ],
           );
 
+    final isTapCrosshairMode =
+        widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag;
+    final gestureChild = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: _onTapDown,
+      onDoubleTap: _onDoubleTap,
+      onScaleStart: isTapCrosshairMode ? null : _onScaleStart,
+      onScaleUpdate: isTapCrosshairMode ? null : _onScaleUpdate,
+      onScaleEnd: isTapCrosshairMode ? null : _onScaleEnd,
+      onLongPressStart: isTapCrosshairMode ? null : _onLongPressStart,
+      onLongPressMoveUpdate: isTapCrosshairMode ? null : _onLongPressMove,
+      onLongPressEnd: isTapCrosshairMode ? null : _onLongPressEnd,
+      child: child,
+    );
+    final interactiveChild = isTapCrosshairMode
+        ? RawGestureDetector(
+            gestures: {
+              _TapCrosshairGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<
+                      _TapCrosshairGestureRecognizer>(
+                _TapCrosshairGestureRecognizer.new,
+                (recognizer) => recognizer
+                  ..shouldStart = _canStartTapCrosshairGesture
+                  ..onStart = _onTapCrosshairGestureStart
+                  ..onHoverStart = _onTapCrosshairHoverStart
+                  ..onHoverUpdate = _onTapCrosshairHoverUpdate
+                  ..onPanUpdate = _onTapCrosshairPanUpdate
+                  ..onEnd = _onTapCrosshairGestureEnd
+                  ..onCancel = _onTapCrosshairGestureCancel,
+              ),
+            },
+            child: gestureChild,
+          )
+        : gestureChild;
+
     return Listener(
-      onPointerDown: _onPointerDown,
-      onPointerMove: _onPointerMove,
-      onPointerUp: _onPointerUp,
       onPointerSignal: _onPointerSignal,
       onPointerHover: _onHover,
-      onPointerCancel: _onPointerCancel,
+      onPointerCancel: isTapCrosshairMode ? null : _onPointerCancel,
       onPointerPanZoomStart: _onPanZoomStart,
       onPointerPanZoomUpdate: _onPanZoomUpdate,
       onPointerPanZoomEnd: _onPanZoomEnd,
       child: MouseRegion(
         onExit: _onExit,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: _onTapDown,
-          onDoubleTap: _onDoubleTap,
-          onScaleStart:
-              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
-                  ? null
-                  : _onScaleStart,
-          onScaleUpdate:
-              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
-                  ? null
-                  : _onScaleUpdate,
-          onScaleEnd: widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
-              ? null
-              : _onScaleEnd,
-          onLongPressStart:
-              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
-                  ? null
-                  : _onLongPressStart,
-          onLongPressMoveUpdate:
-              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
-                  ? null
-                  : _onLongPressMove,
-          onLongPressEnd:
-              widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag
-                  ? null
-                  : _onLongPressEnd,
-          child: child,
-        ),
+        child: interactiveChild,
       ),
     );
   }
@@ -903,6 +862,142 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
       setState(() => _plotOverlay = overlay);
     });
   }
+}
+
+class _TapCrosshairGestureRecognizer extends OneSequenceGestureRecognizer {
+  _TapCrosshairGestureRecognizer();
+
+  bool Function(Offset localPosition)? shouldStart;
+  void Function(PointerDownEvent event)? onStart;
+  void Function(Offset localPosition)? onHoverStart;
+  void Function(PointerMoveEvent event)? onHoverUpdate;
+  void Function(PointerMoveEvent event)? onPanUpdate;
+  VoidCallback? onEnd;
+  VoidCallback? onCancel;
+
+  static const _hoverDelay = Duration(milliseconds: 80);
+
+  int? _pointer;
+  Offset? _startPosition;
+  Offset? _latestPosition;
+  Timer? _timer;
+  bool _accepted = false;
+  bool _hoverActive = false;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    if (shouldStart?.call(event.localPosition) != true) {
+      resolve(GestureDisposition.rejected);
+      return;
+    }
+
+    startTrackingPointer(event.pointer, event.transform);
+    _pointer = event.pointer;
+    _startPosition = event.localPosition;
+    _latestPosition = event.localPosition;
+    _accepted = false;
+    _hoverActive = false;
+    onStart?.call(event);
+    _timer = Timer(_hoverDelay, _acceptHover);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event.pointer != _pointer) return;
+
+    if (event is PointerMoveEvent) {
+      _latestPosition = event.localPosition;
+      if (!_accepted) {
+        final start = _startPosition;
+        if (start == null) return;
+
+        final offset = event.localPosition - start;
+        if (offset.distance <= kTouchSlop) return;
+
+        _timer?.cancel();
+        _timer = null;
+        if (offset.dx.abs() >= offset.dy.abs()) {
+          _accepted = true;
+          _hoverActive = false;
+          resolve(GestureDisposition.accepted);
+          onPanUpdate?.call(event);
+        } else {
+          resolve(GestureDisposition.rejected);
+          _stopTracking(event.pointer, notifyCancel: true);
+        }
+        return;
+      }
+
+      if (_hoverActive) {
+        onHoverUpdate?.call(event);
+      } else {
+        onPanUpdate?.call(event);
+      }
+      return;
+    }
+
+    if (event is PointerUpEvent) {
+      if (_accepted) {
+        onEnd?.call();
+      } else {
+        resolve(GestureDisposition.rejected);
+        onCancel?.call();
+      }
+      _stopTracking(event.pointer, notifyCancel: false);
+      return;
+    }
+
+    if (event is PointerCancelEvent) {
+      if (!_accepted) resolve(GestureDisposition.rejected);
+      _stopTracking(event.pointer, notifyCancel: true);
+    }
+  }
+
+  void _acceptHover() {
+    _timer = null;
+    if (_pointer == null || _latestPosition == null || _accepted) return;
+
+    _accepted = true;
+    _hoverActive = true;
+    resolve(GestureDisposition.accepted);
+    onHoverStart?.call(_latestPosition!);
+  }
+
+  void _stopTracking(int pointer, {required bool notifyCancel}) {
+    stopTrackingPointer(pointer);
+    _timer?.cancel();
+    _timer = null;
+    _pointer = null;
+    _startPosition = null;
+    _latestPosition = null;
+    _accepted = false;
+    _hoverActive = false;
+    if (notifyCancel) onCancel?.call();
+  }
+
+  @override
+  void acceptGesture(int pointer) {
+    _accepted = true;
+  }
+
+  @override
+  void rejectGesture(int pointer) {
+    if (pointer == _pointer) {
+      _stopTracking(pointer, notifyCancel: true);
+    }
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {}
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  String get debugDescription => 'tap crosshair';
 }
 
 enum _ChartOverlaySlot { grid, lastValueLabel }
