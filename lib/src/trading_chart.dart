@@ -615,7 +615,7 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   }
 
   void _onExit(PointerExitEvent e) {
-    _render?.setCrosshair(null);
+    _clearCrosshair();
   }
 
   void _onLongPressStart(LongPressStartDetails d) {
