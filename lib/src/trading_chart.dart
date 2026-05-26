@@ -325,8 +325,6 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   VelocityTracker? _panVelocity;
 
   int? _tapCrosshairPointer;
-  Offset? _tapCrosshairStart;
-  bool _tapCrosshairMoved = false;
 
   @override
   void initState() {
@@ -425,7 +423,7 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
   void _onScaleEnd(ScaleEndDetails d) {
     if (_crosshairScaleActive) {
-      _crosshairScaleActive = false;
+      _clearCrosshair();
       return;
     }
     if (_zone != _GestureZone.plot) return;
@@ -503,38 +501,29 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
     final r = _render;
     if (r == null) return;
+    if (!r.isOverPlot(e.localPosition)) {
+      _clearCrosshair();
+      return;
+    }
 
+    _stopFling();
     _tapCrosshairPointer = e.pointer;
-    _tapCrosshairStart = e.localPosition;
-    _tapCrosshairMoved = false;
+    _crosshairActive = true;
+    _crosshairScaleActive = true;
+    r.setCrosshair(e.localPosition);
   }
 
   void _onPointerMove(PointerMoveEvent e) {
     if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
     if (_tapCrosshairPointer != e.pointer) return;
-    final start = _tapCrosshairStart;
-    if (start == null) return;
-    if ((e.localPosition - start).distance > kTouchSlop) {
-      _tapCrosshairMoved = true;
-    }
+    _render?.setCrosshair(e.localPosition);
   }
 
   void _onPointerUp(PointerUpEvent e) {
     if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
     if (_tapCrosshairPointer != e.pointer) return;
-    final r = _render;
     _tapCrosshairPointer = null;
-    _tapCrosshairStart = null;
-    if (r == null) return;
-
-    if (!_tapCrosshairMoved && r.isOverPlot(e.localPosition)) {
-      _stopFling();
-      _crosshairActive = true;
-      _crosshairScaleActive = false;
-      r.setCrosshair(e.localPosition);
-    } else if (!_tapCrosshairMoved && !r.isOverPlot(e.localPosition)) {
-      _clearCrosshair();
-    }
+    _clearCrosshair();
   }
 
   void _animateZoomTo({required Offset anchor, required double newSpacing}) {
@@ -643,8 +632,6 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
   void _onPointerCancel(PointerCancelEvent e) {
     _tapCrosshairPointer = null;
-    _tapCrosshairStart = null;
-    _tapCrosshairMoved = false;
     _clearCrosshair();
   }
 
