@@ -171,6 +171,133 @@ void main() {
       expect(after.to, lessThan(before.to));
     });
 
+    testWidgets('tapAndDrag crosshair mode shows crosshair on tap',
+        (tester) async {
+      final crosshairEvents = <({Offset? position, int? dataIndex})>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          InteractiveTradingChart(
+            candles: _series(n: 500),
+            touchCrosshairMode: TouchCrosshairMode.tapAndDrag,
+            onCrosshairChanged: (position, dataIndex, candle, [price]) {
+              crosshairEvents.add((position: position, dataIndex: dataIndex));
+            },
+          ),
+        ),
+      );
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(crosshairEvents, isNotEmpty);
+      expect(crosshairEvents.last.position, isNotNull);
+      expect(crosshairEvents.last.dataIndex, isNotNull);
+    });
+
+    testWidgets('tapAndDrag crosshair mode scrubs after tap', (tester) async {
+      final crosshairEvents = <Offset>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          InteractiveTradingChart(
+            candles: _series(n: 500),
+            touchCrosshairMode: TouchCrosshairMode.tapAndDrag,
+            onCrosshairChanged: (position, dataIndex, candle, [price]) {
+              if (position != null) crosshairEvents.add(position);
+            },
+          ),
+        ),
+      );
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 400));
+      final firstPosition = crosshairEvents.last;
+
+      final gesture = await tester.startGesture(center);
+      await tester.pump();
+      await gesture.moveBy(const Offset(-120, 0));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(crosshairEvents.last.dx, lessThan(firstPosition.dx));
+    });
+
+    testWidgets('tapAndDrag crosshair mode lets pre-hover drag pan',
+        (tester) async {
+      final controller = ChartController();
+      addTearDown(controller.dispose);
+      final crosshairEvents = <Offset?>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          InteractiveTradingChart(
+            candles: _series(n: 500),
+            controller: controller,
+            touchCrosshairMode: TouchCrosshairMode.tapAndDrag,
+            onCrosshairChanged: (position, dataIndex, candle, [price]) {
+              crosshairEvents.add(position);
+            },
+          ),
+        ),
+      );
+      final before = controller.visibleLogicalRange!;
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      await tester.dragFrom(center, const Offset(200, 0));
+      await tester.pumpAndSettle();
+
+      final after = controller.visibleLogicalRange!;
+      expect(after.to, lessThan(before.to));
+      expect(crosshairEvents.whereType<Offset>(), isEmpty);
+    });
+
+    testWidgets('default longPress crosshair mode ignores tap', (tester) async {
+      final crosshairEvents = <Offset?>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          InteractiveTradingChart(
+            candles: _series(n: 500),
+            onCrosshairChanged: (position, dataIndex, candle, [price]) {
+              crosshairEvents.add(position);
+            },
+          ),
+        ),
+      );
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(crosshairEvents.whereType<Offset>(), isEmpty);
+    });
+
+    testWidgets('default longPress crosshair mode still shows on long press',
+        (tester) async {
+      final crosshairEvents = <Offset?>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          InteractiveTradingChart(
+            candles: _series(n: 500),
+            onCrosshairChanged: (position, dataIndex, candle, [price]) {
+              crosshairEvents.add(position);
+            },
+          ),
+        ),
+      );
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      await tester.longPressAt(center);
+      await tester.pump();
+
+      expect(crosshairEvents.whereType<Offset>(), isNotEmpty);
+    });
+
     testWidgets('double-tap in the plot scrolls back to the latest',
         (tester) async {
       final controller = ChartController();

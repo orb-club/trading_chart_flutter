@@ -181,6 +181,7 @@ enum _GestureZone { plot, priceAxis, timeAxis }
 /// - Drag on price axis (right): manual zoom Y around drag start.
 /// - Mouse wheel in plot: animated zoom X around cursor.
 /// - Long-press in plot: crosshair on, drag moves it. Release: off.
+/// - Optional tap-and-drag crosshair mode: tap shows it, plot drag scrubs it.
 /// - Hover (mouse): crosshair follows immediately.
 /// - Double-tap on plot: scroll to latest.
 /// - Double-tap on price axis: re-enable autofit.
@@ -208,6 +209,7 @@ class InteractiveTradingChart extends StatefulWidget {
     this.gridBuilder,
     this.lastValueLabelBuilder,
     this.onCrosshairChanged,
+    this.touchCrosshairMode = TouchCrosshairMode.longPress,
   });
 
   /// The full ordered list of bars to render. Times must be ascending.
@@ -278,6 +280,9 @@ class InteractiveTradingChart extends StatefulWidget {
   /// Optional listener for externally painting app-specific crosshair UI.
   final TradingChartCrosshairChanged? onCrosshairChanged;
 
+  /// How touch input should activate the crosshair.
+  final TouchCrosshairMode touchCrosshairMode;
+
   @override
   State<InteractiveTradingChart> createState() =>
       _InteractiveTradingChartState();
@@ -303,6 +308,7 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   double _priceDragStartY = 0;
   double _timeAxisDragStartX = 0;
   bool _crosshairActive = false;
+  bool _crosshairScaleActive = false;
 
   // Inertia (fling) for X-pan in the plot.
   Ticker? _flingTicker;
@@ -317,6 +323,10 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
   // Velocity tracker for fling.
   VelocityTracker? _panVelocity;
+
+  int? _tapCrosshairPointer;
+  Offset? _tapCrosshairStart;
+  bool _tapCrosshairMoved = false;
 
   @override
   void initState() {
@@ -351,6 +361,15 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     final r = _render;
     if (r == null) return;
     _zone = _zoneFor(d.localFocalPoint);
+    _crosshairScaleActive =
+        widget.touchCrosshairMode == TouchCrosshairMode.tapAndDrag &&
+            _crosshairActive &&
+            r.isOverPlot(d.localFocalPoint);
+    if (_crosshairScaleActive) {
+      r.setCrosshair(d.localFocalPoint);
+      return;
+    }
+
     _scaleStartFocal = d.localFocalPoint;
     _scaleStartBarSpacing = r.timeScale.barSpacing;
     _scaleStartAnchorIndex = r.captureAnchorIndex(d.localFocalPoint.dx);
@@ -364,8 +383,8 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     final r = _render;
     if (r == null) return;
 
-    // Crosshair mode disables pan/zoom (long-press took over).
-    if (_crosshairActive) {
+    // Crosshair gestures disable pan/zoom while the user scrubs the chart.
+    if (_crosshairScaleActive) {
       r.setCrosshair(d.localFocalPoint);
       return;
     }
@@ -405,7 +424,10 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   }
 
   void _onScaleEnd(ScaleEndDetails d) {
-    if (_crosshairActive) return;
+    if (_crosshairScaleActive) {
+      _crosshairScaleActive = false;
+      return;
+    }
     if (_zone != _GestureZone.plot) return;
     final v = _panVelocity?.getVelocity().pixelsPerSecond.dx ?? 0;
     if (v.abs() < 200) return;
@@ -475,6 +497,44 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     final factor = math.exp(-dy * 0.0035);
     final desired = (r.timeScale.barSpacing * factor).clamp(1.0, 60.0);
     _animateZoomTo(anchor: e.localPosition, newSpacing: desired);
+  }
+
+  void _onPointerDown(PointerDownEvent e) {
+    if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
+    final r = _render;
+    if (r == null) return;
+
+    _tapCrosshairPointer = e.pointer;
+    _tapCrosshairStart = e.localPosition;
+    _tapCrosshairMoved = false;
+  }
+
+  void _onPointerMove(PointerMoveEvent e) {
+    if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
+    if (_tapCrosshairPointer != e.pointer) return;
+    final start = _tapCrosshairStart;
+    if (start == null) return;
+    if ((e.localPosition - start).distance > kTouchSlop) {
+      _tapCrosshairMoved = true;
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent e) {
+    if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
+    if (_tapCrosshairPointer != e.pointer) return;
+    final r = _render;
+    _tapCrosshairPointer = null;
+    _tapCrosshairStart = null;
+    if (r == null) return;
+
+    if (!_tapCrosshairMoved && r.isOverPlot(e.localPosition)) {
+      _stopFling();
+      _crosshairActive = true;
+      _crosshairScaleActive = false;
+      r.setCrosshair(e.localPosition);
+    } else if (!_tapCrosshairMoved && !r.isOverPlot(e.localPosition)) {
+      _clearCrosshair();
+    }
   }
 
   void _animateZoomTo({required Offset anchor, required double newSpacing}) {
@@ -559,20 +619,38 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   }
 
   void _onLongPressStart(LongPressStartDetails d) {
+    if (widget.touchCrosshairMode != TouchCrosshairMode.longPress) return;
     final r = _render;
     if (r == null) return;
     if (!r.isOverPlot(d.localPosition)) return;
     _stopFling();
     _crosshairActive = true;
+    _crosshairScaleActive = true;
     r.setCrosshair(d.localPosition);
   }
 
   void _onLongPressMove(LongPressMoveUpdateDetails d) {
+    if (widget.touchCrosshairMode != TouchCrosshairMode.longPress) return;
     _render?.setCrosshair(d.localPosition);
   }
 
   void _onLongPressEnd(LongPressEndDetails d) {
+    if (widget.touchCrosshairMode != TouchCrosshairMode.longPress) return;
     _crosshairActive = false;
+    _crosshairScaleActive = false;
+    _render?.setCrosshair(null);
+  }
+
+  void _onPointerCancel(PointerCancelEvent e) {
+    _tapCrosshairPointer = null;
+    _tapCrosshairStart = null;
+    _tapCrosshairMoved = false;
+    _clearCrosshair();
+  }
+
+  void _clearCrosshair() {
+    _crosshairActive = false;
+    _crosshairScaleActive = false;
     _render?.setCrosshair(null);
   }
 
@@ -671,8 +749,12 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
           );
 
     return Listener(
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: _onPointerUp,
       onPointerSignal: _onPointerSignal,
       onPointerHover: _onHover,
+      onPointerCancel: _onPointerCancel,
       onPointerPanZoomStart: _onPanZoomStart,
       onPointerPanZoomUpdate: _onPanZoomUpdate,
       onPointerPanZoomEnd: _onPanZoomEnd,

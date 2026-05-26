@@ -19,7 +19,8 @@ export 'src/model/bar_marker.dart' show BarMarker, MarkerPosition, MarkerShape;
 export 'src/model/candle.dart';
 export 'src/model/chart_pane.dart' show ChartPane, PaneLevel;
 export 'src/model/chart_theme.dart';
-export 'src/model/crosshair.dart' show TradingChartCrosshairChanged;
+export 'src/model/crosshair.dart'
+    show TouchCrosshairMode, TradingChartCrosshairChanged;
 export 'src/model/last_value_label.dart'
     show TradingChartLastValueLabel, TradingChartLastValueLabelBuilder;
 export 'src/model/line_point.dart';
