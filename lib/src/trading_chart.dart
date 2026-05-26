@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -326,6 +327,10 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
   int? _tapCrosshairPointer;
   Offset? _tapCrosshairStart;
+  Offset? _tapCrosshairPosition;
+  Timer? _tapCrosshairTimer;
+
+  static const _tapCrosshairDelay = Duration(milliseconds: 80);
 
   @override
   void initState() {
@@ -338,6 +343,7 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
   @override
   void dispose() {
+    _tapCrosshairTimer?.cancel();
     _flingTicker?.dispose();
     _wheelAnim?.dispose();
     super.dispose();
@@ -384,14 +390,8 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
 
     // Crosshair gestures disable pan/zoom while the user scrubs the chart.
     if (_crosshairScaleActive) {
-      if (_shouldHandOffTapCrosshairToPan(d.localFocalPoint)) {
-        _tapCrosshairPointer = null;
-        _tapCrosshairStart = null;
-        _clearCrosshair();
-      } else {
-        r.setCrosshair(d.localFocalPoint);
-        return;
-      }
+      r.setCrosshair(d.localFocalPoint);
+      return;
     }
 
     _panVelocity?.addPosition(
@@ -516,32 +516,55 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
     _stopFling();
     _tapCrosshairPointer = e.pointer;
     _tapCrosshairStart = e.localPosition;
-    _crosshairActive = true;
-    _crosshairScaleActive = true;
-    r.setCrosshair(e.localPosition);
+    _tapCrosshairPosition = e.localPosition;
+    _tapCrosshairTimer?.cancel();
+    _tapCrosshairTimer = Timer(
+      _tapCrosshairDelay,
+      _activateTapCrosshair,
+    );
   }
 
   void _onPointerMove(PointerMoveEvent e) {
     if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
     if (_tapCrosshairPointer != e.pointer) return;
-    if (_shouldHandOffTapCrosshairToPan(e.localPosition)) {
-      _tapCrosshairPointer = null;
-      _tapCrosshairStart = null;
-      _clearCrosshair();
+    _tapCrosshairPosition = e.localPosition;
+    if (!_crosshairActive &&
+        _shouldCancelPendingTapCrosshair(e.localPosition)) {
+      _cancelPendingTapCrosshair();
       return;
     }
-    _render?.setCrosshair(e.localPosition);
+    if (_crosshairActive) _render?.setCrosshair(e.localPosition);
   }
 
   void _onPointerUp(PointerUpEvent e) {
     if (widget.touchCrosshairMode != TouchCrosshairMode.tapAndDrag) return;
     if (_tapCrosshairPointer != e.pointer) return;
-    _tapCrosshairPointer = null;
-    _tapCrosshairStart = null;
+    _cancelPendingTapCrosshair();
     _clearCrosshair();
   }
 
-  bool _shouldHandOffTapCrosshairToPan(Offset localPosition) {
+  void _activateTapCrosshair() {
+    _tapCrosshairTimer = null;
+    final r = _render;
+    final position = _tapCrosshairPosition;
+    if (r == null || position == null || !r.isOverPlot(position)) {
+      _cancelPendingTapCrosshair();
+      return;
+    }
+    _crosshairActive = true;
+    _crosshairScaleActive = true;
+    r.setCrosshair(position);
+  }
+
+  void _cancelPendingTapCrosshair() {
+    _tapCrosshairTimer?.cancel();
+    _tapCrosshairTimer = null;
+    _tapCrosshairPointer = null;
+    _tapCrosshairStart = null;
+    _tapCrosshairPosition = null;
+  }
+
+  bool _shouldCancelPendingTapCrosshair(Offset localPosition) {
     final start = _tapCrosshairStart;
     if (start == null) return false;
     return (localPosition - start).distance > kTouchSlop;
@@ -652,8 +675,7 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
   }
 
   void _onPointerCancel(PointerCancelEvent e) {
-    _tapCrosshairPointer = null;
-    _tapCrosshairStart = null;
+    _cancelPendingTapCrosshair();
     _clearCrosshair();
   }
 

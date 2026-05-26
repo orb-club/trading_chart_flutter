@@ -171,7 +171,7 @@ void main() {
       expect(after.to, lessThan(before.to));
     });
 
-    testWidgets('tapAndDrag crosshair mode shows crosshair on touch down',
+    testWidgets('tapAndDrag crosshair mode shows crosshair after tap delay',
         (tester) async {
       final crosshairEvents = <Offset?>[];
 
@@ -189,7 +189,7 @@ void main() {
 
       final center = tester.getCenter(find.byType(InteractiveTradingChart));
       final gesture = await tester.startGesture(center);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       expect(crosshairEvents.whereType<Offset>(), isNotEmpty);
 
@@ -199,7 +199,7 @@ void main() {
       expect(crosshairEvents.last, isNull);
     });
 
-    testWidgets('tapAndDrag crosshair mode scrubs before scroll slop',
+    testWidgets('tapAndDrag crosshair mode scrubs after hover activates',
         (tester) async {
       final crosshairEvents = <Offset>[];
       var didClearCrosshair = false;
@@ -222,9 +222,9 @@ void main() {
 
       final center = tester.getCenter(find.byType(InteractiveTradingChart));
       final gesture = await tester.startGesture(center);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
       final firstPosition = crosshairEvents.last;
-      await gesture.moveBy(const Offset(-8, 0));
+      await gesture.moveBy(const Offset(-120, 0));
       await tester.pump();
       expect(crosshairEvents.last.dx, lessThan(firstPosition.dx));
 
@@ -259,8 +259,7 @@ void main() {
 
       final after = controller.visibleLogicalRange!;
       expect(after.to, lessThan(before.to));
-      expect(crosshairEvents.whereType<Offset>(), isNotEmpty);
-      expect(crosshairEvents, contains(isNull));
+      expect(crosshairEvents.whereType<Offset>(), isEmpty);
     });
 
     testWidgets('default longPress crosshair mode ignores tap', (tester) async {
