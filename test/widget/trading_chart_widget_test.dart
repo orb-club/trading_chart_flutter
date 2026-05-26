@@ -406,6 +406,34 @@ void main() {
       expect(crosshairEvents.whereType<Offset>(), isNotEmpty);
     });
 
+    testWidgets('longPress crosshair mode supports a shorter duration',
+        (tester) async {
+      final crosshairEvents = <Offset?>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          InteractiveTradingChart(
+            candles: _series(n: 500),
+            touchCrosshairLongPressDuration: const Duration(milliseconds: 100),
+            onCrosshairChanged: (position, dataIndex, candle, [price]) {
+              crosshairEvents.add(position);
+            },
+          ),
+        ),
+      );
+
+      final center = tester.getCenter(find.byType(InteractiveTradingChart));
+      final gesture = await tester.startGesture(center);
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(crosshairEvents.whereType<Offset>(), isNotEmpty);
+
+      await gesture.up();
+      await tester.pump();
+
+      expect(crosshairEvents.last, isNull);
+    });
+
     testWidgets('double-tap in the plot scrolls back to the latest',
         (tester) async {
       final controller = ChartController();

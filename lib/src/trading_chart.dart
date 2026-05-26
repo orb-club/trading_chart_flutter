@@ -211,6 +211,7 @@ class InteractiveTradingChart extends StatefulWidget {
     this.lastValueLabelBuilder,
     this.onCrosshairChanged,
     this.touchCrosshairMode = TouchCrosshairMode.longPress,
+    this.touchCrosshairLongPressDuration,
   });
 
   /// The full ordered list of bars to render. Times must be ascending.
@@ -283,6 +284,11 @@ class InteractiveTradingChart extends StatefulWidget {
 
   /// How touch input should activate the crosshair.
   final TouchCrosshairMode touchCrosshairMode;
+
+  /// Optional override for the touch long-press activation delay.
+  ///
+  /// Defaults to Flutter's standard long-press timeout when null.
+  final Duration? touchCrosshairLongPressDuration;
 
   @override
   State<InteractiveTradingChart> createState() =>
@@ -791,9 +797,6 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
       onScaleStart: isTapCrosshairMode ? null : _onScaleStart,
       onScaleUpdate: isTapCrosshairMode ? null : _onScaleUpdate,
       onScaleEnd: isTapCrosshairMode ? null : _onScaleEnd,
-      onLongPressStart: isTapCrosshairMode ? null : _onLongPressStart,
-      onLongPressMoveUpdate: isTapCrosshairMode ? null : _onLongPressMove,
-      onLongPressEnd: isTapCrosshairMode ? null : _onLongPressEnd,
       child: child,
     );
     final interactiveChild = isTapCrosshairMode
@@ -815,7 +818,21 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart>
             },
             child: gestureChild,
           )
-        : gestureChild;
+        : RawGestureDetector(
+            gestures: {
+              LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<
+                  LongPressGestureRecognizer>(
+                () => LongPressGestureRecognizer(
+                  duration: widget.touchCrosshairLongPressDuration,
+                ),
+                (recognizer) => recognizer
+                  ..onLongPressStart = _onLongPressStart
+                  ..onLongPressMoveUpdate = _onLongPressMove
+                  ..onLongPressEnd = _onLongPressEnd,
+              ),
+            },
+            child: gestureChild,
+          );
 
     return Listener(
       onPointerSignal: _onPointerSignal,
