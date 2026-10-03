@@ -1,8 +1,18 @@
 # trading_chart_flutter
 
-Pure-Dart candlestick trading chart for Flutter. Custom `RenderObject` pipeline, no WebView, no JavaScript, no platform channels — runs the same on iOS, Android, macOS, Windows, Linux and Web.
+This repository is Orb's fork of [nvsces/trading_chart_flutter](https://github.com/nvsces/trading_chart_flutter).
+The fork is [orb-club/trading_chart_flutter](https://github.com/orb-club/trading_chart_flutter).
+These UI changes are in the `orb-chart-styling` history.
+The chart code in this working tree includes them.
 
-The API is inspired by [Lightweight Charts](https://www.tradingview.com/lightweight-charts/) (data + controller); the gesture model mirrors TradingView (pan, pinch, axis-drag zoom, crosshair, double-tap reset, fling inertia, animated wheel zoom).
+The package is a pure-Dart candlestick chart for Flutter.
+Painting uses a custom `RenderObject`.
+The same widget runs on iOS, Android, macOS, Windows, Linux, and web.
+The package does not use a WebView, JavaScript, or platform channels.
+
+The data API follows [Lightweight Charts](https://www.tradingview.com/lightweight-charts/).
+Gestures follow TradingView.
+Those gestures are pan, pinch, axis-drag zoom, crosshair, double-tap reset, fling, and animated wheel zoom.
 
 <p>
   <img src="demo1.gif" width="49%" alt="Basic chart demo" />
@@ -15,7 +25,7 @@ The API is inspired by [Lightweight Charts](https://www.tradingview.com/lightwei
 - **Volume histogram** rendered as a separate sub-region with its own price scale.
 - **Time axis** with auto bucket-aware ticks (year / month / day / hour boundaries).
 - **Price axis** with "nice" ticks (1, 2, 2.5, 5 × 10ⁿ) and adaptive decimals.
-- **Crosshair** with axis badges; follows mouse hover, activated by long-press on touch.
+- **Crosshair** with axis badges. Mouse hover follows the pointer. Touch starts on long-press unless `touchCrosshairMode` changes that.
 - **Last value** dashed price line + colored badge.
 - **OHLC legend** in the top-left, switches to hovered candle.
 - **Pan / zoom** (drag, pinch, mouse wheel, trackpad).
@@ -28,12 +38,19 @@ The API is inspired by [Lightweight Charts](https://www.tradingview.com/lightwei
 
 ## Getting started
 
-Add to `pubspec.yaml`:
+`pubspec.yaml` in this repository sets the package version to `0.1.0`.
+
+Depend on this fork:
 
 ```yaml
 dependencies:
-  trading_chart_flutter: ^0.0.1
+  trading_chart_flutter:
+    git:
+      url: https://github.com/orb-club/trading_chart_flutter.git
+      ref: orb-chart-styling
 ```
+
+The `example/` app depends on the package with `path: ../`.
 
 Then import:
 
@@ -41,7 +58,7 @@ Then import:
 import 'package:trading_chart_flutter/trading_chart_flutter.dart';
 ```
 
-No platform-specific setup required.
+The package depends only on Flutter.
 
 ## Usage
 
@@ -66,7 +83,41 @@ class MyChart extends StatelessWidget {
 }
 ```
 
-`Candle.time` is a Unix timestamp **in seconds**.
+`Candle.time` is a Unix timestamp in seconds.
+
+### Touch crosshair
+
+`touchCrosshairMode` defaults to `TouchCrosshairMode.longPress`.
+`touchCrosshairLongPressDuration` is an optional `Duration`.
+A null duration uses Flutter's standard long-press timeout.
+The long-press recognizer reads that duration.
+
+The `350` ms value below is only an example.
+
+```dart
+return InteractiveTradingChart(
+  candles: candles,
+  touchCrosshairLongPressDuration: const Duration(milliseconds: 350),
+);
+```
+
+`TouchCrosshairMode.tapAndDrag` uses a tap gesture in the plot.
+The crosshair appears when that gesture is accepted.
+A drag after that accept moves the crosshair.
+
+```dart
+return InteractiveTradingChart(
+  candles: candles,
+  touchCrosshairMode: TouchCrosshairMode.tapAndDrag,
+);
+```
+
+The tap recognizer waits 80 ms, then accepts the pointer.
+An accepted tap-crosshair gesture blocks parent scroll.
+A move past the touch slop before that wait ends chooses a direction.
+The chart pans when the horizontal move is at least the vertical move.
+A larger vertical move rejects the gesture.
+The parent can scroll after that reject.
 
 ### With a controller (live tick + history pagination)
 
@@ -176,7 +227,8 @@ const myTheme = ChartTheme(
 | Trackpad scroll (vertical) | Zoom X around cursor |
 | Trackpad scroll (horizontal) | Pan X |
 | Hover (mouse) | Crosshair follows immediately |
-| Long-press in plot (touch) | Crosshair on; drag to move; release to hide |
+| Long-press in plot (touch) | Crosshair on. Drag moves it. Release hides it. `touchCrosshairLongPressDuration` sets the delay. |
+| Tap in plot (`TouchCrosshairMode.tapAndDrag`) | Crosshair on after accept. Accept blocks parent scroll. A vertical move before accept lets the parent scroll. |
 | Double-tap in plot | Scroll to latest |
 | Double-tap on price axis | Restore autofit |
 | Double-tap on time axis | Reset bar spacing + scroll to latest |
